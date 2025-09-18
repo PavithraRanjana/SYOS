@@ -115,7 +115,8 @@ class InventoryServiceTest {
         when(inventoryRepository.findPhysicalStoreStockByBatch(testProductCode, batchNumber))
             .thenReturn(Optional.of(testPhysicalInventory));
         
-        assertThrows(IllegalArgumentException.class,
+        // The actual implementation throws InsufficientStockException, not IllegalArgumentException
+        assertThrows(InsufficientStockException.class,
             () -> inventoryService.reducePhysicalStoreStock(testProductCode, batchNumber, quantityToReduce));
     }
     
