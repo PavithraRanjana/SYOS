@@ -1,0 +1,11 @@
+package com.syos.exceptions;
+
+public class InvalidPaymentException extends RuntimeException {
+    public InvalidPaymentException(String message) {
+        super(message);
+    }
+
+    public InvalidPaymentException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
