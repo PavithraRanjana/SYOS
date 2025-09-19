@@ -29,8 +29,14 @@ public class PhysicalStoreController {
         this.ui = ui;
     }
 
-    public void start() {
-        ui.displayWelcome();
+    public void startCashierMode() {
+        ui.clearScreen();
+        System.out.println("================================================");
+        System.out.println("           SYOS - Physical Store POS");
+        System.out.println("================================================");
+        System.out.println("Welcome to SYOS Point of Sale System");
+        System.out.println("Physical Store - Cash Only");
+        System.out.println("================================================");
 
         boolean running = true;
         while (running) {
@@ -43,7 +49,7 @@ public class PhysicalStoreController {
                     case "2" -> searchProducts();
                     case "3" -> viewReports();
                     case "4" -> {
-                        ui.displaySuccess("Thank you for using SYOS POS!");
+                        ui.displaySuccess("Returning to main menu...");
                         running = false;
                     }
                     default -> ui.displayError("Invalid option. Please try again.");

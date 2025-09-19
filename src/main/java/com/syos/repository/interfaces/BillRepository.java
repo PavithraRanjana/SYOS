@@ -9,5 +9,6 @@ public interface BillRepository extends Repository<Bill, Integer> {
     BillSerialNumber generateNextSerialNumber(LocalDate billDate);
     List<Bill> findByDate(LocalDate date);
     List<Bill> findByDateRange(LocalDate startDate, LocalDate endDate);
+    List<Bill> findByCustomerId(Integer customerId);
     Bill saveBillWithItems(Bill bill);
 }

@@ -24,6 +24,15 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
+    public MainInventory reserveOnlineStock(ProductCode productCode, int quantity) {
+        return inventoryRepository.findNextAvailableOnlineBatch(productCode, quantity)
+                .orElseThrow(() -> new InsufficientStockException(
+                        "Insufficient online stock for product: " + productCode,
+                        getTotalOnlineStock(productCode),
+                        quantity));
+    }
+
+    @Override
     public void reducePhysicalStoreStock(ProductCode productCode, int batchNumber, int quantity) {
         PhysicalStoreInventory storeInventory = inventoryRepository
                 .findPhysicalStoreStockByBatch(productCode, batchNumber)
@@ -39,6 +48,18 @@ public class InventoryServiceImpl implements InventoryService {
 
         storeInventory.reduceStock(quantity);
         inventoryRepository.updatePhysicalStoreStock(storeInventory);
+    }
+
+    @Override
+    public void reduceOnlineStoreStock(ProductCode productCode, int batchNumber, int quantity) {
+        // Implementation for online store stock reduction
+        // This would be similar to physical store but for online_store_inventory table
+        try {
+            inventoryRepository.reduceOnlineStock(productCode, batchNumber, quantity);
+        } catch (Exception e) {
+            throw new InsufficientStockException(
+                    "Failed to reduce online stock for batch: " + batchNumber, 0, quantity);
+        }
     }
 
     @Override
@@ -59,6 +80,16 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public int getTotalAvailableStock(ProductCode productCode) {
         return inventoryRepository.getTotalPhysicalStock(productCode);
+    }
+
+    @Override
+    public int getTotalOnlineStock(ProductCode productCode) {
+        return inventoryRepository.getTotalOnlineStock(productCode);
+    }
+
+    @Override
+    public boolean isProductAvailableOnline(ProductCode productCode, int quantity) {
+        return getTotalOnlineStock(productCode) >= quantity;
     }
 
     @Override

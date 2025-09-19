@@ -10,8 +10,11 @@ public interface InventoryRepository {
     List<PhysicalStoreInventory> findPhysicalStoreStock(ProductCode productCode);
     List<MainInventory> findMainInventoryBatches(ProductCode productCode);
     Optional<MainInventory> findNextAvailableBatch(ProductCode productCode, int requiredQuantity);
+    Optional<MainInventory> findNextAvailableOnlineBatch(ProductCode productCode, int requiredQuantity);
     Optional<PhysicalStoreInventory> findPhysicalStoreStockByBatch(ProductCode productCode, int batchNumber);
     void updatePhysicalStoreStock(PhysicalStoreInventory inventory);
     void updateMainInventoryStock(MainInventory inventory);
+    void reduceOnlineStock(ProductCode productCode, int batchNumber, int quantity);
     int getTotalPhysicalStock(ProductCode productCode);
+    int getTotalOnlineStock(ProductCode productCode);
 }

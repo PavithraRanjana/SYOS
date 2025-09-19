@@ -157,4 +157,67 @@ public class BillRepositoryImpl implements BillRepository {
     public boolean existsById(Integer billId) {
         return findById(billId).isPresent();
     }
+
+    @Override
+    public List<Bill> findByCustomerId(Integer customerId) {
+        String billSql = """
+        SELECT bill_id, bill_serial_number, customer_id, transaction_type, store_type,
+               subtotal, discount_amount, total_amount, cash_tendered, change_amount, bill_date
+        FROM bill
+        WHERE customer_id = ? AND store_type = 'ONLINE'
+        ORDER BY bill_date DESC
+    """;
+
+        String itemSql = """
+        SELECT bi.product_code, bi.quantity, bi.unit_price, bi.total_price, bi.main_inventory_id,
+               p.product_name
+        FROM bill_item bi
+        JOIN product p ON bi.product_code = p.product_code
+        WHERE bi.bill_id = ?
+    """;
+
+        List<Bill> bills = new ArrayList<>();
+
+        try (PreparedStatement billStmt = connection.prepareStatement(billSql)) {
+            billStmt.setInt(1, customerId);
+            ResultSet billRs = billStmt.executeQuery();
+
+            while (billRs.next()) {
+                // Create bill object
+                Bill bill = new Bill(
+                        new BillSerialNumber(billRs.getString("bill_serial_number")),
+                        billRs.getInt("customer_id"),
+                        TransactionType.valueOf(billRs.getString("transaction_type")),
+                        StoreType.valueOf(billRs.getString("store_type")),
+                        new Money(billRs.getBigDecimal("discount_amount")),
+                        billRs.getDate("bill_date").toLocalDate()
+                );
+
+                // Get bill items for this bill
+                int billId = billRs.getInt("bill_id");
+                try (PreparedStatement itemStmt = connection.prepareStatement(itemSql)) {
+                    itemStmt.setInt(1, billId);
+                    ResultSet itemRs = itemStmt.executeQuery();
+
+                    while (itemRs.next()) {
+                        BillItem item = new BillItem(
+                                new ProductCode(itemRs.getString("product_code")),
+                                itemRs.getString("product_name"),
+                                itemRs.getInt("quantity"),
+                                new Money(itemRs.getBigDecimal("unit_price")),
+                                itemRs.getInt("main_inventory_id")
+                        );
+                        bill.addItem(item);
+                    }
+                }
+
+                bills.add(bill);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error finding bills by customer ID", e);
+        }
+
+        return bills;
+    }
+
 }
