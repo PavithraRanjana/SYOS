@@ -130,27 +130,14 @@ public class BillingServiceImpl implements BillingService {
         // Process payment
         paymentService.processCashPayment(bill, cashTendered);
 
-        // Reduce inventory for each item (this will also be done by DB triggers)
-        for (BillItem item : bill.getItems()) {
-            if (bill.getStoreType() == StoreType.PHYSICAL) {
-                inventoryService.reducePhysicalStoreStock(
-                        item.getProductCode(),
-                        item.getBatchNumber(),
-                        item.getQuantity()
-                );
-            } else {
-                inventoryService.reduceOnlineStoreStock(
-                        item.getProductCode(),
-                        item.getBatchNumber(),
-                        item.getQuantity()
-                );
-            }
-        }
+        // Note: Inventory reduction is handled by database triggers
+        // when bill is saved, so we don't manually reduce here
     }
 
     @Override
     public Bill saveBill(Bill bill) {
         try {
+            // For physical store bills, save and let trigger handle inventory
             return billRepository.saveBillWithItems(bill);
         } catch (Exception e) {
             throw new BillingException("Failed to save bill", e);
@@ -160,16 +147,8 @@ public class BillingServiceImpl implements BillingService {
     @Override
     public Bill saveOnlineBill(Bill bill) {
         try {
-            // For online orders, no payment processing needed (Cash on Delivery)
-            // Just reduce the online inventory
-            for (BillItem item : bill.getItems()) {
-                inventoryService.reduceOnlineStoreStock(
-                        item.getProductCode(),
-                        item.getBatchNumber(),
-                        item.getQuantity()
-                );
-            }
-
+            // For online orders, just save the bill
+            // Database trigger will automatically reduce online inventory
             return billRepository.saveBillWithItems(bill);
         } catch (Exception e) {
             throw new BillingException("Failed to save online order", e);
