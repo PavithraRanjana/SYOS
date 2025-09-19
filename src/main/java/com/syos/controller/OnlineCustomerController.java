@@ -5,6 +5,8 @@ import com.syos.domain.models.BillItem;
 import com.syos.domain.models.Product;
 import com.syos.domain.models.Customer;
 import com.syos.domain.valueobjects.ProductCode;
+import com.syos.domain.valueobjects.Money;
+import com.syos.domain.enums.StoreType;
 import com.syos.exceptions.ProductNotFoundException;
 import com.syos.exceptions.InsufficientStockException;
 import com.syos.exceptions.BillingException;
@@ -23,14 +25,14 @@ public class OnlineCustomerController {
     private final OnlineStoreService onlineStoreService;
     private final CustomerService customerService;
     private final UserInterface ui;
-    
+
     private Customer currentCustomer;
 
     public OnlineCustomerController(BillingService billingService,
-                                   ProductService productService,
-                                   OnlineStoreService onlineStoreService,
-                                   CustomerService customerService,
-                                   UserInterface ui) {
+                                    ProductService productService,
+                                    OnlineStoreService onlineStoreService,
+                                    CustomerService customerService,
+                                    UserInterface ui) {
         this.billingService = billingService;
         this.productService = productService;
         this.onlineStoreService = onlineStoreService;
@@ -82,15 +84,16 @@ public class OnlineCustomerController {
 
     private boolean authenticateCustomer() {
         ui.clearScreen();
-        System.out.println("=== CUSTOMER LOGIN/REGISTRATION ===");
+        System.out.println("=== CUSTOMER LOGIN/REGISTRATION REQUIRED ===");
+        System.out.println("You must have an account to shop online with SYOS");
+        System.out.println();
         System.out.println("1. Login with existing account");
         System.out.println("2. Register new account");
-        System.out.println("3. Continue as guest");
-        System.out.println("4. Back to main menu");
+        System.out.println("3. Back to main menu");
         System.out.print("Select option: ");
 
         String choice = ui.getUserInput();
-        
+
         switch (choice) {
             case "1" -> {
                 return loginCustomer();
@@ -99,15 +102,10 @@ public class OnlineCustomerController {
                 return registerCustomer();
             }
             case "3" -> {
-                this.currentCustomer = null; // Guest user
-                ui.displaySuccess("Continuing as guest user");
-                return true;
-            }
-            case "4" -> {
                 return false;
             }
             default -> {
-                ui.displayError("Invalid option");
+                ui.displayError("Invalid option. Please try again.");
                 return authenticateCustomer();
             }
         }
@@ -115,12 +113,14 @@ public class OnlineCustomerController {
 
     private boolean loginCustomer() {
         String email = ui.getUserInput("Enter your email: ");
+        String password = ui.getUserInput("Enter your password: ");
+
         try {
-            this.currentCustomer = customerService.findCustomerByEmail(email);
+            this.currentCustomer = customerService.loginCustomer(email, password);
             ui.displaySuccess("Welcome back, " + currentCustomer.getCustomerName() + "!");
             return true;
         } catch (Exception e) {
-            ui.displayError("Customer not found. Please register or try again.");
+            ui.displayError("Login failed: " + e.getMessage());
             return authenticateCustomer();
         }
     }
@@ -129,10 +129,18 @@ public class OnlineCustomerController {
         try {
             String name = ui.getUserInput("Enter your full name: ");
             String email = ui.getUserInput("Enter your email: ");
+            String password = ui.getUserInput("Enter your password (min 6 characters): ");
+            String confirmPassword = ui.getUserInput("Confirm your password: ");
+
+            if (!password.equals(confirmPassword)) {
+                ui.displayError("Passwords do not match. Please try again.");
+                return registerCustomer();
+            }
+
             String phone = ui.getUserInput("Enter your phone number: ");
             String address = ui.getUserInput("Enter your address: ");
 
-            this.currentCustomer = customerService.registerCustomer(name, email, phone, address);
+            this.currentCustomer = customerService.registerCustomer(name, email, phone, address, password);
             ui.displaySuccess("Registration successful! Welcome, " + name + "!");
             return true;
         } catch (Exception e) {
@@ -145,11 +153,7 @@ public class OnlineCustomerController {
         ui.clearScreen();
         System.out.println("================================================");
         System.out.println("           SYOS Online Store");
-        if (currentCustomer != null) {
-            System.out.println("        Welcome, " + currentCustomer.getCustomerName());
-        } else {
-            System.out.println("           Guest User");
-        }
+        System.out.println("        Welcome, " + currentCustomer.getCustomerName());
         System.out.println("================================================");
         System.out.println();
         System.out.println("=== ONLINE STORE MENU ===");
@@ -166,10 +170,10 @@ public class OnlineCustomerController {
         try {
             ui.clearScreen();
             System.out.println("=== BROWSE BY CATEGORY ===");
-            
+
             // Get categories
             Map<String, List<Product>> productsByCategory = onlineStoreService.getProductsByCategory();
-            
+
             if (productsByCategory.isEmpty()) {
                 ui.displayError("No products available online.");
                 ui.waitForEnter();
@@ -181,21 +185,21 @@ public class OnlineCustomerController {
             System.out.println("====================");
             int index = 1;
             for (String category : productsByCategory.keySet()) {
-                System.out.printf("%d. %s (%d products)\n", 
-                    index++, category, productsByCategory.get(category).size());
+                System.out.printf("%d. %s (%d products)\n",
+                        index++, category, productsByCategory.get(category).size());
             }
             System.out.println("0. Back to menu");
-            
+
             String choice = ui.getUserInput("\nSelect category: ");
-            
+
             if ("0".equals(choice)) {
                 return;
             }
-            
+
             try {
                 int categoryIndex = Integer.parseInt(choice) - 1;
                 String[] categories = productsByCategory.keySet().toArray(new String[0]);
-                
+
                 if (categoryIndex >= 0 && categoryIndex < categories.length) {
                     String selectedCategory = categories[categoryIndex];
                     displayProductsInCategory(selectedCategory, productsByCategory.get(selectedCategory));
@@ -205,9 +209,9 @@ public class OnlineCustomerController {
             } catch (NumberFormatException e) {
                 ui.displayError("Please enter a valid number");
             }
-            
+
             ui.waitForEnter();
-            
+
         } catch (Exception e) {
             ui.displayError("Failed to load categories: " + e.getMessage());
             ui.waitForEnter();
@@ -218,23 +222,23 @@ public class OnlineCustomerController {
         ui.clearScreen();
         System.out.println("=== " + category.toUpperCase() + " ===");
         System.out.println();
-        
-        System.out.printf("%-15s %-35s %-12s %-10s %s\n", 
-            "Code", "Product Name", "Price", "Stock", "Description");
+
+        System.out.printf("%-15s %-35s %-12s %-10s %s\n",
+                "Code", "Product Name", "Price", "Stock", "Description");
         System.out.println("=".repeat(90));
-        
+
         for (Product product : products) {
             int onlineStock = onlineStoreService.getAvailableStock(product.getProductCode());
             String stockStatus = onlineStock > 0 ? String.valueOf(onlineStock) : "Out of Stock";
-            
+
             System.out.printf("%-15s %-35s %-12s %-10s %s\n",
-                product.getProductCode().getCode(),
-                truncate(product.getProductName(), 34),
-                product.getUnitPrice(),
-                stockStatus,
-                truncate(product.getDescription() != null ? product.getDescription() : "", 30));
+                    product.getProductCode().getCode(),
+                    truncate(product.getProductName(), 34),
+                    product.getUnitPrice(),
+                    stockStatus,
+                    truncate(product.getDescription() != null ? product.getDescription() : "", 30));
         }
-        
+
         System.out.println("=".repeat(90));
         System.out.println("Total products in " + category + ": " + products.size());
     }
@@ -243,22 +247,22 @@ public class OnlineCustomerController {
         try {
             ui.clearScreen();
             String searchTerm = ui.getUserInput("Enter search term (product name, brand, category): ");
-            
+
             if (searchTerm.trim().isEmpty()) {
                 return;
             }
-            
+
             List<Product> products = productService.searchProducts(searchTerm);
-            
+
             if (products.isEmpty()) {
                 ui.displayError("No products found for: " + searchTerm);
                 ui.waitForEnter();
                 return;
             }
-            
+
             displaySearchResults(products, searchTerm);
             ui.waitForEnter();
-            
+
         } catch (Exception e) {
             ui.displayError("Search failed: " + e.getMessage());
             ui.waitForEnter();
@@ -269,23 +273,23 @@ public class OnlineCustomerController {
         ui.clearScreen();
         System.out.println("=== SEARCH RESULTS FOR: " + searchTerm + " ===");
         System.out.println();
-        
-        System.out.printf("%-15s %-35s %-12s %-10s %s\n", 
-            "Code", "Product Name", "Price", "Stock", "Description");
+
+        System.out.printf("%-15s %-35s %-12s %-10s %s\n",
+                "Code", "Product Name", "Price", "Stock", "Description");
         System.out.println("=".repeat(90));
-        
+
         for (Product product : products) {
             int onlineStock = onlineStoreService.getAvailableStock(product.getProductCode());
             String stockStatus = onlineStock > 0 ? String.valueOf(onlineStock) : "Out of Stock";
-            
+
             System.out.printf("%-15s %-35s %-12s %-10s %s\n",
-                product.getProductCode().getCode(),
-                truncate(product.getProductName(), 34),
-                product.getUnitPrice(),
-                stockStatus,
-                truncate(product.getDescription() != null ? product.getDescription() : "", 30));
+                    product.getProductCode().getCode(),
+                    truncate(product.getProductName(), 34),
+                    product.getUnitPrice(),
+                    stockStatus,
+                    truncate(product.getDescription() != null ? product.getDescription() : "", 30));
         }
-        
+
         System.out.println("=".repeat(90));
         System.out.println("Found " + products.size() + " products");
     }
@@ -295,7 +299,7 @@ public class OnlineCustomerController {
             ui.clearScreen();
             ui.displaySuccess("Starting online shopping session...");
 
-            // Create new online bill
+            // Create new online bill (customer is guaranteed to exist now)
             Bill bill = billingService.createNewOnlineBill(currentCustomer, LocalDate.now());
 
             // Shopping phase
@@ -389,7 +393,7 @@ public class OnlineCustomerController {
         System.out.println("=".repeat(50));
         System.out.printf("Order No: %s\n", bill.getBillSerialNumber());
         System.out.printf("Date: %s\n", bill.getBillDate());
-        System.out.printf("Customer: %s\n", currentCustomer != null ? currentCustomer.getCustomerName() : "Guest");
+        System.out.printf("Customer: %s\n", currentCustomer.getCustomerName());
         System.out.printf("Payment: Cash on Delivery\n");
         System.out.println("-".repeat(50));
 
@@ -411,15 +415,10 @@ public class OnlineCustomerController {
     }
 
     private void viewMyOrders() {
-        if (currentCustomer == null) {
-            ui.displayError("Please login to view your orders.");
-            ui.waitForEnter();
-            return;
-        }
-
+        // Customer is guaranteed to exist (no guest users allowed)
         try {
             List<Bill> orders = billingService.getCustomerOrders(currentCustomer.getCustomerId());
-            
+
             if (orders.isEmpty()) {
                 ui.displayError("No orders found.");
                 ui.waitForEnter();
@@ -439,20 +438,20 @@ public class OnlineCustomerController {
         ui.clearScreen();
         System.out.println("=== MY ORDERS ===");
         System.out.println();
-        
-        System.out.printf("%-15s %-12s %-15s %-12s %s\n", 
-            "Order No", "Date", "Items", "Total", "Status");
+
+        System.out.printf("%-15s %-12s %-15s %-12s %s\n",
+                "Order No", "Date", "Items", "Total", "Status");
         System.out.println("=".repeat(70));
-        
+
         for (Bill order : orders) {
             System.out.printf("%-15s %-12s %-15d %-12s %s\n",
-                order.getBillSerialNumber().getSerialNumber(),
-                order.getBillDate(),
-                order.getItemCount(),
-                order.getTotalAmount(),
-                "Confirmed");
+                    order.getBillSerialNumber().getSerialNumber(),
+                    order.getBillDate(),
+                    order.getItemCount(),
+                    order.getTotalAmount(),
+                    "Confirmed");
         }
-        
+
         System.out.println("=".repeat(70));
         System.out.println("Total orders: " + orders.size());
     }

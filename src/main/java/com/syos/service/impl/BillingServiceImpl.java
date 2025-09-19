@@ -55,11 +55,15 @@ public class BillingServiceImpl implements BillingService {
 
     @Override
     public Bill createNewOnlineBill(Customer customer, LocalDate billDate) {
+        if (customer == null) {
+            throw new BillingException("Customer is required for online orders");
+        }
+
         BillSerialNumber serialNumber = billRepository.generateNextSerialNumber(billDate);
 
         return new Bill(
                 serialNumber,
-                customer != null ? customer.getCustomerId() : null,
+                customer.getCustomerId(),
                 TransactionType.ONLINE,
                 StoreType.ONLINE,
                 new Money(0.0), // No discount for now

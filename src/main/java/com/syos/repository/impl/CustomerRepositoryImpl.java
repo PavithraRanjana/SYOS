@@ -20,7 +20,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     public Optional<Customer> findById(Integer customerId) {
         String sql = """
             SELECT customer_id, customer_name, email, phone, address, 
-                   registration_date, is_active
+                   password_hash, registration_date, is_active
             FROM customer
             WHERE customer_id = ?
         """;
@@ -43,7 +43,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     public Optional<Customer> findByEmail(String email) {
         String sql = """
             SELECT customer_id, customer_name, email, phone, address, 
-                   registration_date, is_active
+                   password_hash, registration_date, is_active
             FROM customer
             WHERE email = ? AND is_active = TRUE
         """;
@@ -63,10 +63,16 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     }
 
     @Override
-    public Customer saveCustomer(String name, String email, String phone, String address) {
+    public Optional<Customer> findByEmailWithPassword(String email) {
+        // Same as findByEmail - includes password hash
+        return findByEmail(email);
+    }
+
+    @Override
+    public Customer saveCustomer(String name, String email, String phone, String address, String passwordHash) {
         String sql = """
-            INSERT INTO customer (customer_name, email, phone, address, registration_date, is_active)
-            VALUES (?, ?, ?, ?, ?, TRUE)
+            INSERT INTO customer (customer_name, email, phone, address, password_hash, registration_date, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE)
         """;
 
         try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -74,21 +80,22 @@ public class CustomerRepositoryImpl implements CustomerRepository {
             stmt.setString(2, email);
             stmt.setString(3, phone);
             stmt.setString(4, address);
-            stmt.setDate(5, Date.valueOf(LocalDate.now()));
+            stmt.setString(5, passwordHash);
+            stmt.setDate(6, Date.valueOf(LocalDate.now()));
 
             int rowsAffected = stmt.executeUpdate();
-            
+
             if (rowsAffected > 0) {
                 ResultSet generatedKeys = stmt.getGeneratedKeys();
                 if (generatedKeys.next()) {
                     int customerId = generatedKeys.getInt(1);
-                    return new Customer(customerId, name, email, phone, address, 
-                                      LocalDate.now(), true);
+                    return new Customer(customerId, name, email, phone, address,
+                            passwordHash, LocalDate.now(), true);
                 }
             }
-            
+
             throw new SQLException("Creating customer failed, no ID obtained");
-            
+
         } catch (SQLException e) {
             throw new RuntimeException("Error saving customer", e);
         }
@@ -103,7 +110,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     public List<Customer> findAll() {
         String sql = """
             SELECT customer_id, customer_name, email, phone, address, 
-                   registration_date, is_active
+                   password_hash, registration_date, is_active
             FROM customer
             WHERE is_active = TRUE
             ORDER BY customer_name
@@ -113,7 +120,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             ResultSet rs = stmt.executeQuery();
-            
+
             while (rs.next()) {
                 customers.add(mapResultSetToCustomer(rs));
             }
@@ -132,7 +139,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     @Override
     public void delete(Integer customerId) {
         String sql = "UPDATE customer SET is_active = FALSE WHERE customer_id = ?";
-        
+
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setInt(1, customerId);
             stmt.executeUpdate();
@@ -153,6 +160,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
                 rs.getString("email"),
                 rs.getString("phone"),
                 rs.getString("address"),
+                rs.getString("password_hash"),
                 rs.getDate("registration_date").toLocalDate(),
                 rs.getBoolean("is_active")
         );
