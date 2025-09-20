@@ -1,5 +1,7 @@
 package com.syos.controller;
 
+import com.syos.service.impl.BillingServiceImpl;
+import com.syos.service.impl.BillingServiceImplWithDebug;
 import com.syos.ui.interfaces.UserInterface;
 import com.syos.service.interfaces.BillingService;
 import com.syos.service.interfaces.ProductService;
@@ -16,11 +18,11 @@ public class MainMenuController {
     private final PhysicalStoreController cashierController;
     private final OnlineCustomerController onlineCustomerController;
 
-    public MainMenuController(BillingService billingService,
-                             ProductService productService,
-                             OnlineStoreService onlineStoreService,
-                             CustomerService customerService,
-                             UserInterface ui) {
+    public MainMenuController(BillingServiceImpl billingService,
+                              ProductService productService,
+                              OnlineStoreService onlineStoreService,
+                              CustomerService customerService,
+                              UserInterface ui) {
         this.billingService = billingService;
         this.productService = productService;
         this.onlineStoreService = onlineStoreService;

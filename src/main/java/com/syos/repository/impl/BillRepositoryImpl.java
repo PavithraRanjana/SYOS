@@ -27,11 +27,10 @@ public class BillRepositoryImpl implements BillRepository {
         String sql = """
             SELECT COALESCE(MAX(CAST(SUBSTRING(bill_serial_number, 5) AS UNSIGNED)), 0) + 1 as next_number
             FROM bill
-            WHERE bill_date = ?
+            WHERE bill_serial_number REGEXP '^BILL[0-9]+$'
         """;
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setDate(1, Date.valueOf(billDate));
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
@@ -219,5 +218,4 @@ public class BillRepositoryImpl implements BillRepository {
 
         return bills;
     }
-
 }
