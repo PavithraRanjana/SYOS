@@ -202,7 +202,7 @@ public class OnlineCustomerController {
 
                 if (categoryIndex >= 0 && categoryIndex < categories.length) {
                     String selectedCategory = categories[categoryIndex];
-                    displayProductsInCategory(selectedCategory, productsByCategory.get(selectedCategory));
+                    displayProductsInCategoryWithActions(selectedCategory, productsByCategory.get(selectedCategory));
                 } else {
                     ui.displayError("Invalid category selection");
                 }
@@ -215,6 +215,287 @@ public class OnlineCustomerController {
         } catch (Exception e) {
             ui.displayError("Failed to load categories: " + e.getMessage());
             ui.waitForEnter();
+        }
+    }
+
+    private void displayProductsInCategoryWithActions(String category, List<Product> products) {
+        while (true) {
+            ui.clearScreen();
+            System.out.println("=== " + category.toUpperCase() + " ===");
+            System.out.println();
+
+            System.out.printf("%-15s %-35s %-12s %-10s %s\n",
+                    "Code", "Product Name", "Price", "Stock", "Description");
+            System.out.println("=".repeat(90));
+
+            for (Product product : products) {
+                int onlineStock = onlineStoreService.getAvailableStock(product.getProductCode());
+                String stockStatus = onlineStock > 0 ? String.valueOf(onlineStock) : "Out of Stock";
+
+                System.out.printf("%-15s %-35s %-12s %-10s %s\n",
+                        product.getProductCode().getCode(),
+                        truncate(product.getProductName(), 34),
+                        product.getUnitPrice(),
+                        stockStatus,
+                        truncate(product.getDescription() != null ? product.getDescription() : "", 30));
+            }
+
+            System.out.println("=".repeat(90));
+            System.out.println("Total products in " + category + ": " + products.size());
+            System.out.println();
+
+            // Enhanced options
+            System.out.println("=== OPTIONS ===");
+            System.out.println("1. 🛒 Buy a product (enter product code)");
+            System.out.println("2. ⬅️  Back to categories");
+            System.out.println("3. 🏠 Back to main menu");
+            System.out.println("4. ❌ Exit shopping");
+            System.out.print("Select option: ");
+
+            String choice = ui.getUserInput();
+
+            switch (choice) {
+                case "1" -> {
+                    if (buyProductFromCategory(products)) {
+                        // Product purchased successfully, continue showing category
+                        continue;
+                    }
+                }
+                case "2" -> {
+                    return; // Go back to category selection
+                }
+                case "3" -> {
+                    return; // Will return to main menu
+                }
+                case "4" -> {
+                    ui.displaySuccess("Thank you for browsing SYOS!");
+                    System.exit(0);
+                }
+                default -> {
+                    ui.displayError("Invalid option. Please try again.");
+                    ui.waitForEnter();
+                }
+            }
+        }
+    }
+
+    private boolean buyProductFromCategory(List<Product> products) {
+        String productCodeInput = null;
+        try {
+            productCodeInput = ui.getUserInput("Enter product code to buy: ");
+
+            if (productCodeInput.trim().isEmpty()) {
+                ui.displayError("Product code cannot be empty.");
+                ui.waitForEnter();
+                return false;
+            }
+
+            ProductCode productCode = new ProductCode(productCodeInput);
+
+            // Verify the product exists in this category
+            Product selectedProduct = products.stream()
+                    .filter(p -> p.getProductCode().equals(productCode))
+                    .findFirst()
+                    .orElse(null);
+
+            if (selectedProduct == null) {
+                ui.displayError("Product code not found in this category. Please check the code and try again.");
+                ui.waitForEnter();
+                return false;
+            }
+
+            // Check stock availability
+            int availableStock = onlineStoreService.getAvailableStock(productCode);
+            if (availableStock == 0) {
+                ui.displayError("Sorry, this product is currently out of stock online.");
+                ui.waitForEnter();
+                return false;
+            }
+
+            // Display product details
+            System.out.println("\n=== PRODUCT DETAILS ===");
+            System.out.println("Product: " + selectedProduct.getProductName());
+            System.out.println("Price: " + selectedProduct.getUnitPrice());
+            System.out.println("Available: " + availableStock + " units");
+            System.out.println("Description: " + (selectedProduct.getDescription() != null ? selectedProduct.getDescription() : "N/A"));
+            System.out.println();
+
+            // Get quantity
+            int quantity = getQuantityInput(availableStock);
+            if (quantity <= 0) {
+                return false; // User cancelled or invalid input
+            }
+
+            // Confirm purchase
+            Money totalPrice = selectedProduct.getUnitPrice().multiply(quantity);
+            System.out.println("Total cost: " + totalPrice);
+
+            if (!ui.confirmAction("Add to cart and checkout now?")) {
+                ui.displaySuccess("Purchase cancelled.");
+                ui.waitForEnter();
+                return false;
+            }
+
+            // Create bill and add item
+            Bill bill = billingService.createNewOnlineBill(currentCustomer, LocalDate.now());
+            BillItem item = billingService.addItemToOnlineBill(bill, productCode, quantity);
+
+            // Display item added
+            System.out.println("\n✅ Added to cart:");
+            ui.displayBillItem(item);
+
+            // Ask if they want to add more items
+            if (ui.confirmAction("Add more items to this order?")) {
+                // Continue with full shopping mode
+                continueShoppingWithExistingBill(bill);
+            } else {
+                // Proceed to checkout
+                completeQuickCheckout(bill);
+            }
+
+            return true;
+
+        } catch (ProductNotFoundException e) {
+            ui.displayError("Product not found: " + e.getMessage());
+            ui.waitForEnter();
+            return false;
+        } catch (InsufficientStockException e) {
+            ui.displayInsufficientStock(
+                    productCodeInput,
+                    e.getAvailableStock(),
+                    e.getRequestedQuantity()
+            );
+            ui.waitForEnter();
+            return false;
+        } catch (BillingException e) {
+            ui.displayError("Order error: " + e.getMessage());
+            ui.waitForEnter();
+            return false;
+        } catch (Exception e) {
+            ui.displayError("Unexpected error: " + e.getMessage());
+            ui.waitForEnter();
+            return false;
+        }
+    }
+
+    private int getQuantityInput(int maxAvailable) {
+        while (true) {
+            try {
+                String input = ui.getUserInput("Enter quantity (max " + maxAvailable + ") or 0 to cancel: ");
+                int quantity = Integer.parseInt(input);
+
+                if (quantity == 0) {
+                    return 0; // User cancelled
+                }
+
+                if (quantity < 0) {
+                    ui.displayError("Quantity cannot be negative.");
+                    continue;
+                }
+
+                if (quantity > maxAvailable) {
+                    ui.displayError("Only " + maxAvailable + " units available.");
+                    continue;
+                }
+
+                return quantity;
+            } catch (NumberFormatException e) {
+                ui.displayError("Please enter a valid number.");
+            }
+        }
+    }
+
+    private void continueShoppingWithExistingBill(Bill bill) {
+        try {
+            ui.clearScreen();
+            System.out.println("=== CONTINUE SHOPPING ===");
+            System.out.println("Current order:");
+            ui.displayBillSummary(bill);
+            System.out.println();
+
+            boolean addingItems = true;
+            while (addingItems) {
+                ProductCode productCode = null;
+                try {
+                    productCode = ui.getProductCode();
+
+                    if (productCode == null) {
+                        // User typed 'done'
+                        addingItems = false;
+                        continue;
+                    }
+
+                    // Check if product is available online
+                    int availableStock = onlineStoreService.getAvailableStock(productCode);
+                    if (availableStock == 0) {
+                        ui.displayError("Product not available online: " + productCode);
+                        continue;
+                    }
+
+                    // Show product details
+                    Product product = productService.findProductByCode(productCode);
+                    System.out.println("\nProduct: " + product.getProductName());
+                    System.out.println("Price: " + product.getUnitPrice());
+                    System.out.println("Available: " + availableStock + " units");
+                    System.out.println("Description: " + (product.getDescription() != null ? product.getDescription() : "N/A"));
+
+                    // Get quantity
+                    int quantity = ui.getQuantity();
+
+                    if (quantity > availableStock) {
+                        ui.displayInsufficientStock(product.getProductName(), availableStock, quantity);
+                        continue;
+                    }
+
+                    // Add item to bill
+                    BillItem item = billingService.addItemToOnlineBill(bill, productCode, quantity);
+
+                    // Display added item and running total
+                    ui.displayBillItem(item);
+                    ui.displayRunningTotal(billingService.calculateRunningTotal(bill));
+
+                } catch (ProductNotFoundException e) {
+                    ui.displayError("Product not found: " + e.getMessage());
+                } catch (InsufficientStockException e) {
+                    ui.displayInsufficientStock(
+                            productCode.getCode(),
+                            e.getAvailableStock(),
+                            e.getRequestedQuantity()
+                    );
+                } catch (BillingException e) {
+                    ui.displayError("Order error: " + e.getMessage());
+                }
+            }
+
+            // Complete checkout
+            completeQuickCheckout(bill);
+
+        } catch (Exception e) {
+            ui.displayError("Shopping failed: " + e.getMessage());
+        }
+    }
+
+    private void completeQuickCheckout(Bill bill) {
+        try {
+            // Display order summary
+            ui.displayBillSummary(bill);
+
+            // Confirm order
+            if (!ui.confirmAction("Confirm order (Cash on Delivery)?")) {
+                ui.displaySuccess("Order cancelled.");
+                return;
+            }
+
+            // Process order (Cash on Delivery - no payment needed now)
+            Bill savedBill = billingService.saveOnlineBill(bill);
+
+            // Display order confirmation
+            displayOrderConfirmation(savedBill);
+
+            ui.waitForEnter();
+
+        } catch (Exception e) {
+            ui.displayError("Checkout failed: " + e.getMessage());
         }
     }
 

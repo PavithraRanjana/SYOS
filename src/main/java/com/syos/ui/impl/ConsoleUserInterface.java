@@ -83,6 +83,34 @@ public class ConsoleUserInterface implements UserInterface {
         }
     }
 
+    // Enhanced method for quantity input with max limit
+    public int getQuantity(int maxAvailable) {
+        while (true) {
+            try {
+                String input = getUserInput("Enter quantity (max " + maxAvailable + ") or 0 to cancel: ");
+                int quantity = Integer.parseInt(input);
+
+                if (quantity == 0) {
+                    return 0; // User cancelled
+                }
+
+                if (quantity < 0) {
+                    displayError("Quantity cannot be negative.");
+                    continue;
+                }
+
+                if (quantity > maxAvailable) {
+                    displayError("Only " + maxAvailable + " units available.");
+                    continue;
+                }
+
+                return quantity;
+            } catch (NumberFormatException e) {
+                displayError("Please enter a valid number.");
+            }
+        }
+    }
+
     @Override
     public Money getCashAmount() {
         while (true) {
@@ -224,6 +252,75 @@ public class ConsoleUserInterface implements UserInterface {
     @Override
     public void waitForEnter() {
         getUserInput("Press Enter to continue...");
+    }
+
+    // Additional methods for enhanced online shopping experience
+    public void displayCategoryMenu(String[] categories) {
+        System.out.println("Available Categories:");
+        System.out.println("====================");
+        for (int i = 0; i < categories.length; i++) {
+            System.out.printf("%d. %s\n", i + 1, categories[i]);
+        }
+        System.out.println("0. Back to menu");
+    }
+
+    public void displayProductInCategory(Product product, int stock) {
+        String stockStatus = stock > 0 ? String.valueOf(stock) : "Out of Stock";
+        System.out.printf("%-15s %-35s %-12s %-10s %s\n",
+                product.getProductCode().getCode(),
+                truncateText(product.getProductName(), 34),
+                product.getUnitPrice(),
+                stockStatus,
+                truncateText(product.getDescription() != null ? product.getDescription() : "", 30));
+    }
+
+    public void displayShoppingOptions() {
+        System.out.println("\n=== OPTIONS ===");
+        System.out.println("1. 🛒 Buy a product (enter product code)");
+        System.out.println("2. ⬅️  Back to categories");
+        System.out.println("3. 🏠 Back to main menu");
+        System.out.println("4. ❌ Exit shopping");
+        System.out.print("Select option: ");
+    }
+
+    public void displayProductDetails(Product product, int availableStock) {
+        System.out.println("\n=== PRODUCT DETAILS ===");
+        System.out.println("Product: " + product.getProductName());
+        System.out.println("Code: " + product.getProductCode());
+        System.out.println("Price: " + product.getUnitPrice());
+        System.out.println("Available: " + availableStock + " units");
+        System.out.println("Description: " + (product.getDescription() != null ? product.getDescription() : "N/A"));
+        System.out.println("Unit: " + product.getUnitOfMeasure().getValue());
+        System.out.println();
+    }
+
+    public void displayOrderProgress(String message) {
+        System.out.println("🛒 " + message);
+    }
+
+    public void displayCartSummary(Bill bill) {
+        System.out.println("\n=== CURRENT CART ===");
+        if (bill.isEmpty()) {
+            System.out.println("Cart is empty.");
+            return;
+        }
+
+        for (BillItem item : bill.getItems()) {
+            System.out.printf("• %s x%d = %s\n",
+                    item.getProductName(),
+                    item.getQuantity(),
+                    item.getTotalPrice());
+        }
+        System.out.println("─".repeat(30));
+        System.out.printf("Total: %s\n", bill.getTotalAmount());
+        System.out.println("=".repeat(30));
+    }
+
+    private String truncateText(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength - 3) + "...";
     }
 
     public void close() {

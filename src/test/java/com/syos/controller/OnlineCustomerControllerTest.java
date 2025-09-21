@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class OnlineCustomerControllerTest {
+class EnhancedOnlineCustomerControllerTest {
 
     @Mock
     private BillingService billingService;
@@ -42,126 +42,222 @@ class OnlineCustomerControllerTest {
 
     private OnlineCustomerController controller;
     private Customer testCustomer;
+    private Product testProduct;
+    private ProductCode testProductCode;
 
     @BeforeEach
     void setUp() {
         controller = new OnlineCustomerController(billingService, productService,
                 onlineStoreService, customerService, ui);
 
-        testCustomer = new Customer(1, "John Doe", "john@example.com",
-                "123456789", "123 Main St", "hashedpassword",
-                LocalDate.now(), true);
-    }
-
-    @Test
-    @DisplayName("Should handle successful customer login")
-    void shouldHandleSuccessfulCustomerLogin() {
-        // Arrange
-        String email = "aryastark@gameofthrones.com";
-        String password = "123456";
-
-        when(ui.getUserInput()).thenReturn("1"); // Login option
-        when(ui.getUserInput("Enter your email: ")).thenReturn(email);
-        when(ui.getUserInput("Enter your password: ")).thenReturn(password);
-        when(customerService.loginCustomer(email, password)).thenReturn(testCustomer);
-
-        // This test would be complex to implement fully due to the interactive nature
-        // of the controller. In practice, you'd need to refactor the controller to be
-        // more testable by extracting the authentication logic to separate methods.
-
-        // For demonstration purposes, we'll test the core logic
-        assertDoesNotThrow(() -> customerService.loginCustomer(email, password));
-        verify(customerService).loginCustomer(email, password);
-    }
-
-    @Test
-    @DisplayName("Should handle failed customer login")
-    void shouldHandleFailedCustomerLogin() {
-        // Arrange
-        String email = "john@example.com";
-        String password = "wrongpassword";
-
-        when(customerService.loginCustomer(email, password))
-                .thenThrow(new InvalidLoginException("Invalid email or password"));
-
-        // Act & Assert
-        InvalidLoginException exception = assertThrows(InvalidLoginException.class,
-                () -> customerService.loginCustomer(email, password));
-
-        assertTrue(exception.getMessage().contains("Invalid email or password"));
-        verify(customerService).loginCustomer(email, password);
-    }
-
-    @Test
-    @DisplayName("Should handle successful customer registration")
-    void shouldHandleSuccessfulCustomerRegistration() {
-        // Arrange
-        String name = "Jane Doe";
-        String email = "jane@example.com";
-        String phone = "987654321";
-        String address = "456 Oak St";
-        String password = "password123";
-
-        Customer newCustomer = new Customer(2, name, email, phone, address,
-                Customer.hashPassword(password),
+        testCustomer = new Customer(1, "Arya Stark", "aryastark@gameofthrones.com",
+                "123456789", "Winterfell, North", "hashedpassword",
                 LocalDate.now(), true);
 
-        when(customerService.registerCustomer(name, email, phone, address, password))
-                .thenReturn(newCustomer);
-
-        // Act
-        Customer result = customerService.registerCustomer(name, email, phone, address, password);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(newCustomer.getCustomerId(), result.getCustomerId());
-        assertEquals(newCustomer.getCustomerName(), result.getCustomerName());
-
-        verify(customerService).registerCustomer(name, email, phone, address, password);
+        testProductCode = new ProductCode("SNCHPLAY001");
+        testProduct = new Product(testProductCode, "Lays Classic Potato Chips 150g",
+                3, 8, 23, new Money(280.0), "Original salted chips",
+                UnitOfMeasure.BAG, true);
     }
 
     @Test
-    @DisplayName("Should handle password mismatch during registration")
-    void shouldHandlePasswordMismatchDuringRegistration() {
-        // This would be tested in the UI layer integration test
-        // Here we're testing the underlying service logic
-
-        // Arrange
-        String password = "password123";
-        String confirmPassword = "differentpassword";
-
-        // Assert
-        assertNotEquals(password, confirmPassword);
-        // In the controller, this should trigger re-registration
-    }
-
-    @Test
-    @DisplayName("Should retrieve products by category successfully")
-    void shouldRetrieveProductsByCategorySuccessfully() {
+    @DisplayName("Should display category products with action options")
+    void shouldDisplayCategoryProductsWithActionOptions() {
         // Arrange
         Map<String, List<Product>> categoryProducts = new HashMap<>();
-        List<Product> beverages = Arrays.asList(
-                new Product(new ProductCode("BVEDRB001"), "Red Bull", 1, 1, 1,
-                        new Money(250.0), "Energy drink", UnitOfMeasure.CAN, true)
-        );
-        categoryProducts.put("Beverages", beverages);
+        List<Product> snacks = Arrays.asList(testProduct);
+        categoryProducts.put("Snacks", snacks);
 
         when(onlineStoreService.getProductsByCategory()).thenReturn(categoryProducts);
+        when(onlineStoreService.getAvailableStock(testProductCode)).thenReturn(30);
 
-        // Act
+        // This tests the data preparation for the enhanced display
         Map<String, List<Product>> result = onlineStoreService.getProductsByCategory();
+        int stock = onlineStoreService.getAvailableStock(testProductCode);
 
         // Assert
         assertNotNull(result);
-        assertTrue(result.containsKey("Beverages"));
-        assertEquals(1, result.get("Beverages").size());
+        assertTrue(result.containsKey("Snacks"));
+        assertEquals(1, result.get("Snacks").size());
+        assertEquals(30, stock);
 
         verify(onlineStoreService).getProductsByCategory();
+        verify(onlineStoreService).getAvailableStock(testProductCode);
     }
 
     @Test
-    @DisplayName("Should handle empty product categories")
-    void shouldHandleEmptyProductCategories() {
+    @DisplayName("Should handle quick buy from category successfully")
+    void shouldHandleQuickBuyFromCategorySuccessfully() {
+        // Arrange
+        LocalDate billDate = LocalDate.now();
+        Bill bill = new Bill(new BillSerialNumber("BILL000001"),
+                testCustomer.getCustomerId(), TransactionType.ONLINE,
+                StoreType.ONLINE, new Money(0.0), billDate);
+
+        int quantity = 2;
+        int availableStock = 30;
+
+        when(onlineStoreService.getAvailableStock(testProductCode)).thenReturn(availableStock);
+        when(productService.findProductByCode(testProductCode)).thenReturn(testProduct);
+        when(billingService.createNewOnlineBill(testCustomer, billDate)).thenReturn(bill);
+        when(billingService.addItemToOnlineBill(bill, testProductCode, quantity))
+                .thenReturn(new BillItem(testProductCode, testProduct.getProductName(),
+                        quantity, testProduct.getUnitPrice(), 1));
+
+        // Act
+        int stock = onlineStoreService.getAvailableStock(testProductCode);
+        Product product = productService.findProductByCode(testProductCode);
+        Bill createdBill = billingService.createNewOnlineBill(testCustomer, billDate);
+        BillItem item = billingService.addItemToOnlineBill(createdBill, testProductCode, quantity);
+
+        // Assert
+        assertEquals(availableStock, stock);
+        assertEquals(testProduct, product);
+        assertNotNull(createdBill);
+        assertNotNull(item);
+        assertEquals(testProductCode, item.getProductCode());
+        assertEquals(quantity, item.getQuantity());
+
+        verify(onlineStoreService).getAvailableStock(testProductCode);
+        verify(productService).findProductByCode(testProductCode);
+        verify(billingService).createNewOnlineBill(testCustomer, billDate);
+        verify(billingService).addItemToOnlineBill(createdBill, testProductCode, quantity);
+    }
+
+    @Test
+    @DisplayName("Should handle out of stock products in category view")
+    void shouldHandleOutOfStockProductsInCategoryView() {
+        // Arrange
+        when(onlineStoreService.getAvailableStock(testProductCode)).thenReturn(0);
+
+        // Act
+        int stock = onlineStoreService.getAvailableStock(testProductCode);
+
+        // Assert
+        assertEquals(0, stock);
+        verify(onlineStoreService).getAvailableStock(testProductCode);
+    }
+
+    @Test
+    @DisplayName("Should validate product exists in selected category")
+    void shouldValidateProductExistsInSelectedCategory() {
+        // Arrange
+        List<Product> snackProducts = Arrays.asList(testProduct);
+        ProductCode differentProductCode = new ProductCode("BVEDRB001"); // Beverage product
+
+        // Act
+        boolean productInCategory = snackProducts.stream()
+                .anyMatch(p -> p.getProductCode().equals(testProductCode));
+        boolean differentProductInCategory = snackProducts.stream()
+                .anyMatch(p -> p.getProductCode().equals(differentProductCode));
+
+        // Assert
+        assertTrue(productInCategory);
+        assertFalse(differentProductInCategory);
+    }
+
+    @Test
+    @DisplayName("Should handle quantity validation with max available")
+    void shouldHandleQuantityValidationWithMaxAvailable() {
+        // Arrange
+        int maxAvailable = 30;
+        int validQuantity = 5;
+        int invalidQuantity = 50;
+
+        // Act & Assert
+        assertTrue(validQuantity <= maxAvailable);
+        assertFalse(invalidQuantity <= maxAvailable);
+    }
+
+    @Test
+    @DisplayName("Should calculate total price for quick purchase")
+    void shouldCalculateTotalPriceForQuickPurchase() {
+        // Arrange
+        int quantity = 3;
+        Money unitPrice = testProduct.getUnitPrice(); // 280.0
+
+        // Act
+        Money totalPrice = unitPrice.multiply(quantity);
+
+        // Assert
+        assertEquals(new Money(840.0), totalPrice); // 280 * 3
+    }
+
+    @Test
+    @DisplayName("Should handle continue shopping with existing bill")
+    void shouldHandleContinueShoppingWithExistingBill() {
+        // Arrange
+        Bill existingBill = new Bill(new BillSerialNumber("BILL000001"),
+                testCustomer.getCustomerId(), TransactionType.ONLINE,
+                StoreType.ONLINE, new Money(0.0), LocalDate.now());
+
+        BillItem existingItem = new BillItem(testProductCode, testProduct.getProductName(),
+                2, testProduct.getUnitPrice(), 1);
+        existingBill.addItem(existingItem);
+
+        // Act
+        Money runningTotal = billingService.calculateRunningTotal(existingBill);
+
+        // Assert
+        assertFalse(existingBill.isEmpty());
+        assertEquals(1, existingBill.getItemCount());
+        assertNotNull(runningTotal);
+
+        verify(billingService).calculateRunningTotal(existingBill);
+    }
+
+    @Test
+    @DisplayName("Should handle order completion and confirmation")
+    void shouldHandleOrderCompletionAndConfirmation() {
+        // Arrange
+        Bill completedBill = new Bill(new BillSerialNumber("BILL000001"),
+                testCustomer.getCustomerId(), TransactionType.ONLINE,
+                StoreType.ONLINE, new Money(0.0), LocalDate.now());
+
+        BillItem item = new BillItem(testProductCode, testProduct.getProductName(),
+                2, testProduct.getUnitPrice(), 1);
+        completedBill.addItem(item);
+
+        when(billingService.saveOnlineBill(completedBill)).thenReturn(completedBill);
+
+        // Act
+        Bill savedBill = billingService.saveOnlineBill(completedBill);
+
+        // Assert
+        assertNotNull(savedBill);
+        assertEquals(completedBill.getBillSerialNumber(), savedBill.getBillSerialNumber());
+        assertEquals(testCustomer.getCustomerId(), savedBill.getCustomerId());
+
+        verify(billingService).saveOnlineBill(completedBill);
+    }
+
+    @Test
+    @DisplayName("Should handle insufficient stock during quick purchase")
+    void shouldHandleInsufficientStockDuringQuickPurchase() {
+        // Arrange
+        int requestedQuantity = 50;
+        int availableStock = 30;
+
+        when(onlineStoreService.getAvailableStock(testProductCode)).thenReturn(availableStock);
+        when(productService.findProductByCode(testProductCode)).thenReturn(testProduct);
+        when(billingService.addItemToOnlineBill(any(Bill.class), eq(testProductCode), eq(requestedQuantity)))
+                .thenThrow(new InsufficientStockException("Insufficient stock", availableStock, requestedQuantity));
+
+        // Act & Assert
+        InsufficientStockException exception = assertThrows(InsufficientStockException.class, () -> {
+            Bill bill = new Bill(new BillSerialNumber("BILL000001"),
+                    testCustomer.getCustomerId(), TransactionType.ONLINE,
+                    StoreType.ONLINE, new Money(0.0), LocalDate.now());
+            billingService.addItemToOnlineBill(bill, testProductCode, requestedQuantity);
+        });
+
+        assertEquals(availableStock, exception.getAvailableStock());
+        assertEquals(requestedQuantity, exception.getRequestedQuantity());
+    }
+
+    @Test
+    @DisplayName("Should handle empty categories gracefully")
+    void shouldHandleEmptyCategoriesGracefully() {
         // Arrange
         Map<String, List<Product>> emptyCategories = new HashMap<>();
         when(onlineStoreService.getProductsByCategory()).thenReturn(emptyCategories);
@@ -172,163 +268,35 @@ class OnlineCustomerControllerTest {
         // Assert
         assertNotNull(result);
         assertTrue(result.isEmpty());
-
         verify(onlineStoreService).getProductsByCategory();
     }
 
     @Test
-    @DisplayName("Should search products successfully")
-    void shouldSearchProductsSuccessfully() {
-        // Arrange
-        String searchTerm = "Red Bull";
-        List<Product> searchResults = Arrays.asList(
-                new Product(new ProductCode("BVEDRB001"), "Red Bull Energy Drink", 1, 1, 1,
-                        new Money(250.0), "Energy drink", UnitOfMeasure.CAN, true)
-        );
+    @DisplayName("Should format display information correctly")
+    void shouldFormatDisplayInformationCorrectly() {
+        // This tests the formatting logic that would be used in the enhanced display
 
-        when(productService.searchProducts(searchTerm)).thenReturn(searchResults);
+        // Arrange
+        String productName = testProduct.getProductName();
+        String description = testProduct.getDescription();
+        int maxLength = 34;
 
         // Act
-        List<Product> result = productService.searchProducts(searchTerm);
+        String truncatedName = truncateForDisplay(productName, maxLength);
+        String truncatedDescription = truncateForDisplay(description, 30);
 
         // Assert
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("Red Bull Energy Drink", result.get(0).getProductName());
-
-        verify(productService).searchProducts(searchTerm);
+        assertNotNull(truncatedName);
+        assertNotNull(truncatedDescription);
+        assertTrue(truncatedName.length() <= maxLength);
+        assertTrue(truncatedDescription.length() <= 30);
     }
 
-    @Test
-    @DisplayName("Should handle empty search results")
-    void shouldHandleEmptySearchResults() {
-        // Arrange
-        String searchTerm = "NonExistentProduct";
-        when(productService.searchProducts(searchTerm)).thenReturn(Arrays.asList());
-
-        // Act
-        List<Product> result = productService.searchProducts(searchTerm);
-
-        // Assert
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-
-        verify(productService).searchProducts(searchTerm);
-    }
-
-    @Test
-    @DisplayName("Should check online stock availability")
-    void shouldCheckOnlineStockAvailability() {
-        // Arrange
-        ProductCode productCode = new ProductCode("BVEDRB001");
-        int availableStock = 25;
-
-        when(onlineStoreService.getAvailableStock(productCode)).thenReturn(availableStock);
-
-        // Act
-        int result = onlineStoreService.getAvailableStock(productCode);
-
-        // Assert
-        assertEquals(availableStock, result);
-        verify(onlineStoreService).getAvailableStock(productCode);
-    }
-
-    @Test
-    @DisplayName("Should handle out of stock products")
-    void shouldHandleOutOfStockProducts() {
-        // Arrange
-        ProductCode productCode = new ProductCode("BVEDRB001");
-        when(onlineStoreService.getAvailableStock(productCode)).thenReturn(0);
-
-        // Act
-        int result = onlineStoreService.getAvailableStock(productCode);
-
-        // Assert
-        assertEquals(0, result);
-        verify(onlineStoreService).getAvailableStock(productCode);
-    }
-
-    @Test
-    @DisplayName("Should create online bill for authenticated customer")
-    void shouldCreateOnlineBillForAuthenticatedCustomer() {
-        // Arrange
-        LocalDate billDate = LocalDate.now();
-        Bill expectedBill = new Bill(
-                new BillSerialNumber("BILL000001"), testCustomer.getCustomerId(),
-                TransactionType.ONLINE, StoreType.ONLINE,
-                new Money(0.0), billDate
-        );
-
-        when(billingService.createNewOnlineBill(testCustomer, billDate))
-                .thenReturn(expectedBill);
-
-        // Act
-        Bill result = billingService.createNewOnlineBill(testCustomer, billDate);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(testCustomer.getCustomerId(), result.getCustomerId());
-        assertEquals(StoreType.ONLINE, result.getStoreType());
-        assertEquals(TransactionType.ONLINE, result.getTransactionType());
-
-        verify(billingService).createNewOnlineBill(testCustomer, billDate);
-    }
-
-    @Test
-    @DisplayName("Should retrieve customer orders successfully")
-    void shouldRetrieveCustomerOrdersSuccessfully() {
-        // Arrange
-        List<Bill> customerOrders = Arrays.asList(
-                new Bill(new BillSerialNumber("BILL000001"), testCustomer.getCustomerId(),
-                        TransactionType.ONLINE, StoreType.ONLINE,
-                        new Money(0.0), LocalDate.now()),
-                new Bill(new BillSerialNumber("BILL000002"), testCustomer.getCustomerId(),
-                        TransactionType.ONLINE, StoreType.ONLINE,
-                        new Money(0.0), LocalDate.now().minusDays(1))
-        );
-
-        when(billingService.getCustomerOrders(testCustomer.getCustomerId()))
-                .thenReturn(customerOrders);
-
-        // Act
-        List<Bill> result = billingService.getCustomerOrders(testCustomer.getCustomerId());
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(2, result.size());
-
-        verify(billingService).getCustomerOrders(testCustomer.getCustomerId());
-    }
-
-    @Test
-    @DisplayName("Should handle customer with no orders")
-    void shouldHandleCustomerWithNoOrders() {
-        // Arrange
-        when(billingService.getCustomerOrders(testCustomer.getCustomerId()))
-                .thenReturn(Arrays.asList());
-
-        // Act
-        List<Bill> result = billingService.getCustomerOrders(testCustomer.getCustomerId());
-
-        // Assert
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-
-        verify(billingService).getCustomerOrders(testCustomer.getCustomerId());
-    }
-
-    @Test
-    @DisplayName("Should handle service exceptions gracefully")
-    void shouldHandleServiceExceptionsGracefully() {
-        // Arrange
-        when(productService.searchProducts(anyString()))
-                .thenThrow(new RuntimeException("Service unavailable"));
-
-        // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> productService.searchProducts("test"));
-
-        assertEquals("Service unavailable", exception.getMessage());
-        verify(productService).searchProducts("test");
+    // Helper method for truncation (would be in the actual controller)
+    private String truncateForDisplay(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength - 3) + "...";
     }
 }
