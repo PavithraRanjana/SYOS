@@ -11,10 +11,10 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProductRepositoryTest {
-    
+
     private ProductCode testProductCode;
     private Product expectedProduct;
-    
+
     @BeforeEach
     void setUp() {
         testProductCode = new ProductCode("BVEDRB001");
@@ -28,7 +28,7 @@ class ProductRepositoryTest {
             true
         );
     }
-    
+
     @Test
     @DisplayName("Should demonstrate repository test structure")
     void shouldDemonstrateRepositoryTestStructure() {
@@ -38,58 +38,58 @@ class ProductRepositoryTest {
         // 2. Use TestContainers for integration testing with real database
         // 3. Use H2 in-memory database for fast unit tests
         // 4. Mock only the database connection/statements for pure unit tests
-        
+
         assertTrue(true, "Repository tests should use actual database or test containers");
     }
-    
+
     @Test
     @DisplayName("Should validate product mapping logic")
     void shouldValidateProductMappingLogic() {
         // This would test the mapping logic from database fields to domain object
         // Example: ResultSet → Product conversion
-        
+
         assertNotNull(expectedProduct);
         assertEquals(testProductCode, expectedProduct.getProductCode());
         assertEquals("Red Bull Energy Drink 250ml", expectedProduct.getProductName());
         assertEquals(new Money(250.0), expectedProduct.getUnitPrice());
     }
-    
+
     @Test
     @DisplayName("Should demonstrate search functionality expectations")
     void shouldDemonstrateSearchFunctionalityExpectations() {
         // This would test that search works across multiple fields
         // In real implementation:
         // - Search by product code should work
-        // - Search by product name should work  
+        // - Search by product name should work
         // - Search by category should work
         // - Search by brand should work
-        
+
         assertTrue(true, "Search should work across product code, name, category, brand");
     }
-    
+
     @Test
     @DisplayName("Should demonstrate active product filtering")
     void shouldDemonstrateActiveProductFiltering() {
         // This would test that only products with is_active = TRUE are returned
         assertTrue(expectedProduct.isActive(), "Should filter for active products only");
     }
-    
+
     /*
      * Note: For actual database testing, consider:
-     * 
+     *
      * 1. Use @DataJpaTest for JPA repositories
      * 2. Use TestContainers for integration testing with real database
      * 3. Use H2 in-memory database for fast unit tests
      * 4. Mock only the database connection/statements for pure unit tests
-     * 
+     *
      * Example with TestContainers:
-     * 
+     *
      * @TestMethodSource
      * static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
      *     .withDatabaseName("syos_test")
      *     .withUsername("test")
      *     .withPassword("test");
-     * 
+     *
      * @BeforeAll
      * static void configureProperties() {
      *     mysql.start();
