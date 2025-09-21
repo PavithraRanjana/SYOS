@@ -13,9 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.time.LocalDate;
 
 class BillTest {
-    
+
     private Bill bill;
-    
+
     @BeforeEach
     void setUp() {
         bill = new Bill(
@@ -27,7 +27,7 @@ class BillTest {
             LocalDate.now()
         );
     }
-    
+
     @Test
     @DisplayName("Should create empty bill")
     void shouldCreateEmptyBill() {
@@ -35,7 +35,7 @@ class BillTest {
         assertEquals(0, bill.getItemCount());
         assertEquals(new Money(0.0), bill.getSubtotal());
     }
-    
+
     @Test
     @DisplayName("Should add item to bill")
     void shouldAddItemToBill() {
@@ -46,14 +46,14 @@ class BillTest {
             new Money(250.0),
             1
         );
-        
+
         bill.addItem(item);
-        
+
         assertFalse(bill.isEmpty());
         assertEquals(1, bill.getItemCount());
         assertEquals(new Money(500.0), bill.getSubtotal());
     }
-    
+
     @Test
     @DisplayName("Should calculate total with discount")
     void shouldCalculateTotalWithDiscount() {
@@ -65,7 +65,7 @@ class BillTest {
             new Money(50.0), // discount
             LocalDate.now()
         );
-        
+
         BillItem item = new BillItem(
             new ProductCode("BVEDRB001"),
             "Red Bull Energy Drink",
@@ -73,13 +73,13 @@ class BillTest {
             new Money(250.0),
             1
         );
-        
+
         billWithDiscount.addItem(item);
-        
+
         assertEquals(new Money(500.0), billWithDiscount.getSubtotal());
         assertEquals(new Money(450.0), billWithDiscount.getTotalAmount());
     }
-    
+
     @Test
     @DisplayName("Should process cash payment correctly")
     void shouldProcessCashPaymentCorrectly() {
@@ -91,14 +91,14 @@ class BillTest {
             1
         );
         bill.addItem(item);
-        
+
         Money cashTendered = new Money(300.0);
         bill.processCashPayment(cashTendered);
-        
+
         assertEquals(cashTendered, bill.getCashTendered());
         assertEquals(new Money(50.0), bill.getChangeAmount());
     }
-    
+
     @Test
     @DisplayName("Should throw exception for insufficient cash payment")
     void shouldThrowExceptionForInsufficientCashPayment() {
@@ -110,7 +110,7 @@ class BillTest {
             1
         );
         bill.addItem(item);
-        
+
         Money insufficientCash = new Money(200.0);
         assertThrows(IllegalArgumentException.class, () -> bill.processCashPayment(insufficientCash));
     }
