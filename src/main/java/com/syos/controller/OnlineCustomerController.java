@@ -168,49 +168,63 @@ public class OnlineCustomerController {
 
     private void browseProductsByCategory() {
         try {
-            ui.clearScreen();
-            System.out.println("=== BROWSE BY CATEGORY ===");
+            while (true) {
+                ui.clearScreen();
+                System.out.println("=== BROWSE BY CATEGORY ===");
 
-            // Get categories
-            Map<String, List<Product>> productsByCategory = onlineStoreService.getProductsByCategory();
+                // Get categories
+                Map<String, List<Product>> productsByCategory = onlineStoreService.getProductsByCategory();
 
-            if (productsByCategory.isEmpty()) {
-                ui.displayError("No products available online.");
-                ui.waitForEnter();
-                return;
-            }
-
-            // Display categories
-            System.out.println("Available Categories:");
-            System.out.println("====================");
-            int index = 1;
-            for (String category : productsByCategory.keySet()) {
-                System.out.printf("%d. %s (%d products)\n",
-                        index++, category, productsByCategory.get(category).size());
-            }
-            System.out.println("0. Back to menu");
-
-            String choice = ui.getUserInput("\nSelect category: ");
-
-            if ("0".equals(choice)) {
-                return;
-            }
-
-            try {
-                int categoryIndex = Integer.parseInt(choice) - 1;
-                String[] categories = productsByCategory.keySet().toArray(new String[0]);
-
-                if (categoryIndex >= 0 && categoryIndex < categories.length) {
-                    String selectedCategory = categories[categoryIndex];
-                    displayProductsInCategoryWithActions(selectedCategory, productsByCategory.get(selectedCategory));
-                } else {
-                    ui.displayError("Invalid category selection");
+                if (productsByCategory.isEmpty()) {
+                    ui.displayError("No products available online.");
+                    ui.waitForEnter();
+                    return;
                 }
-            } catch (NumberFormatException e) {
-                ui.displayError("Please enter a valid number");
-            }
 
-            ui.waitForEnter();
+                // Display categories
+                System.out.println("Available Categories:");
+                System.out.println("====================");
+                int index = 1;
+                for (String category : productsByCategory.keySet()) {
+                    System.out.printf("%d. %s (%d products)\n",
+                            index++, category, productsByCategory.get(category).size());
+                }
+                System.out.println("0. Back to menu");
+
+                String choice = ui.getUserInput("\nSelect category: ");
+
+                if ("0".equals(choice)) {
+                    return; // Go back to main online store menu
+                }
+
+                try {
+                    int categoryIndex = Integer.parseInt(choice) - 1;
+                    String[] categories = productsByCategory.keySet().toArray(new String[0]);
+
+                    if (categoryIndex >= 0 && categoryIndex < categories.length) {
+                        String selectedCategory = categories[categoryIndex];
+                        CategoryNavigationResult result = displayProductsInCategoryWithActions(
+                                selectedCategory, productsByCategory.get(selectedCategory));
+
+                        // Handle navigation result
+                        if (result == CategoryNavigationResult.BACK_TO_MAIN_MENU) {
+                            return; // Exit category browsing completely
+                        } else if (result == CategoryNavigationResult.BACK_TO_CATEGORIES) {
+                            continue; // Show categories again
+                        } else if (result == CategoryNavigationResult.EXIT_APPLICATION) {
+                            ui.displaySuccess("Thank you for shopping with SYOS!");
+                            System.exit(0);
+                        }
+                        // If CONTINUE_IN_CATEGORY, the loop in displayProductsInCategoryWithActions handles it
+                    } else {
+                        ui.displayError("Invalid category selection");
+                        ui.waitForEnter();
+                    }
+                } catch (NumberFormatException e) {
+                    ui.displayError("Please enter a valid number");
+                    ui.waitForEnter();
+                }
+            }
 
         } catch (Exception e) {
             ui.displayError("Failed to load categories: " + e.getMessage());
@@ -218,7 +232,15 @@ public class OnlineCustomerController {
         }
     }
 
-    private void displayProductsInCategoryWithActions(String category, List<Product> products) {
+    // Add this enum at the top of the class (after the fields)
+    enum CategoryNavigationResult {
+        CONTINUE_IN_CATEGORY,
+        BACK_TO_CATEGORIES,
+        BACK_TO_MAIN_MENU,
+        EXIT_APPLICATION
+    }
+
+    private CategoryNavigationResult displayProductsInCategoryWithActions(String category, List<Product> products) {
         while (true) {
             ui.clearScreen();
             System.out.println("=== " + category.toUpperCase() + " ===");
@@ -260,16 +282,16 @@ public class OnlineCustomerController {
                         // Product purchased successfully, continue showing category
                         continue;
                     }
+                    // If purchase was cancelled or failed, continue showing category
                 }
                 case "2" -> {
-                    return; // Go back to category selection
+                    return CategoryNavigationResult.BACK_TO_CATEGORIES;
                 }
                 case "3" -> {
-                    return; // Will return to main menu
+                    return CategoryNavigationResult.BACK_TO_MAIN_MENU;
                 }
                 case "4" -> {
-                    ui.displaySuccess("Thank you for browsing SYOS!");
-                    System.exit(0);
+                    return CategoryNavigationResult.EXIT_APPLICATION;
                 }
                 default -> {
                     ui.displayError("Invalid option. Please try again.");
