@@ -40,7 +40,7 @@ class CustomerRepositoryTest {
     @DisplayName("Should demonstrate customer repository test structure")
     void shouldDemonstrateCustomerRepositoryTestStructure() {
         // This test demonstrates the expected structure for repository tests
-        // In a real implementation, you would:
+
 
         // 1. Setup test data
         String name = "John Doe";
