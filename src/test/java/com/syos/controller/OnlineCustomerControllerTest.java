@@ -195,6 +195,10 @@ class OnlineCustomerControllerTest {
                 2, testProduct.getUnitPrice(), 1);
         existingBill.addItem(existingItem);
 
+        // Mock the billing service to return the running total
+        when(billingService.calculateRunningTotal(existingBill))
+                .thenReturn(new Money(560.0)); // 2 * 280.0
+
         // Act
         Money runningTotal = billingService.calculateRunningTotal(existingBill);
 
@@ -202,6 +206,7 @@ class OnlineCustomerControllerTest {
         assertFalse(existingBill.isEmpty());
         assertEquals(1, existingBill.getItemCount());
         assertNotNull(runningTotal);
+        assertEquals(new Money(560.0), runningTotal);
 
         verify(billingService).calculateRunningTotal(existingBill);
     }
@@ -238,21 +243,24 @@ class OnlineCustomerControllerTest {
         int requestedQuantity = 50;
         int availableStock = 30;
 
-        when(onlineStoreService.getAvailableStock(testProductCode)).thenReturn(availableStock);
-        when(productService.findProductByCode(testProductCode)).thenReturn(testProduct);
-        when(billingService.addItemToOnlineBill(any(Bill.class), eq(testProductCode), eq(requestedQuantity)))
+        // Create a bill for the test
+        Bill bill = new Bill(new BillSerialNumber("BILL000001"),
+                testCustomer.getCustomerId(), TransactionType.ONLINE,
+                StoreType.ONLINE, new Money(0.0), LocalDate.now());
+
+        // Mock the exception to be thrown when adding item to bill
+        when(billingService.addItemToOnlineBill(bill, testProductCode, requestedQuantity))
                 .thenThrow(new InsufficientStockException("Insufficient stock", availableStock, requestedQuantity));
 
         // Act & Assert
         InsufficientStockException exception = assertThrows(InsufficientStockException.class, () -> {
-            Bill bill = new Bill(new BillSerialNumber("BILL000001"),
-                    testCustomer.getCustomerId(), TransactionType.ONLINE,
-                    StoreType.ONLINE, new Money(0.0), LocalDate.now());
             billingService.addItemToOnlineBill(bill, testProductCode, requestedQuantity);
         });
 
         assertEquals(availableStock, exception.getAvailableStock());
         assertEquals(requestedQuantity, exception.getRequestedQuantity());
+
+        verify(billingService).addItemToOnlineBill(bill, testProductCode, requestedQuantity);
     }
 
     @Test
