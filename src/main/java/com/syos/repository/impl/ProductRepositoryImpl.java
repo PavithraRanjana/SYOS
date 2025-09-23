@@ -128,25 +128,128 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public List<Product> findAll() {
-        // Implementation similar to findActiveProducts but without WHERE clause
-        throw new UnsupportedOperationException("Not implemented yet");
+        String sql = """
+            SELECT p.product_code, p.product_name, p.category_id, p.subcategory_id,
+                   p.brand_id, p.unit_price, p.description, p.unit_of_measure, p.is_active
+            FROM product p
+            ORDER BY p.product_code
+        """;
+
+        List<Product> products = new ArrayList<>();
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                products.add(mapResultSetToProduct(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error finding all products", e);
+        }
+
+        return products;
     }
 
     @Override
-    public Product save(Product entity) {
-        // Implementation for saving/updating product
-        throw new UnsupportedOperationException("Not implemented yet");
+    public Product save(Product product) {
+        if (existsById(product.getProductCode())) {
+            return updateProduct(product);
+        } else {
+            return insertProduct(product);
+        }
+    }
+
+    private Product insertProduct(Product product) {
+        String sql = """
+            INSERT INTO product (product_code, product_name, category_id, subcategory_id,
+                               brand_id, unit_price, description, unit_of_measure, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """;
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, product.getProductCode().getCode());
+            stmt.setString(2, product.getProductName());
+            stmt.setInt(3, product.getCategoryId());
+            stmt.setInt(4, product.getSubcategoryId());
+            stmt.setInt(5, product.getBrandId());
+            stmt.setBigDecimal(6, product.getUnitPrice().getAmount());
+            stmt.setString(7, product.getDescription());
+            stmt.setString(8, product.getUnitOfMeasure().name().toLowerCase());
+            stmt.setBoolean(9, product.isActive());
+
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                return product;
+            } else {
+                throw new SQLException("Creating product failed, no rows affected");
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Error inserting product", e);
+        }
+    }
+
+    private Product updateProduct(Product product) {
+        String sql = """
+            UPDATE product 
+            SET product_name = ?, category_id = ?, subcategory_id = ?, brand_id = ?,
+                unit_price = ?, description = ?, unit_of_measure = ?, is_active = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE product_code = ?
+        """;
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, product.getProductName());
+            stmt.setInt(2, product.getCategoryId());
+            stmt.setInt(3, product.getSubcategoryId());
+            stmt.setInt(4, product.getBrandId());
+            stmt.setBigDecimal(5, product.getUnitPrice().getAmount());
+            stmt.setString(6, product.getDescription());
+            stmt.setString(7, product.getUnitOfMeasure().name().toLowerCase());
+            stmt.setBoolean(8, product.isActive());
+            stmt.setString(9, product.getProductCode().getCode());
+
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                return product;
+            } else {
+                throw new SQLException("Updating product failed, no rows affected");
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Error updating product", e);
+        }
     }
 
     @Override
     public void delete(ProductCode productCode) {
-        // Implementation for deleting product
-        throw new UnsupportedOperationException("Not implemented yet");
+        // Soft delete - just mark as inactive
+        String sql = """
+            UPDATE product 
+            SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+            WHERE product_code = ?
+        """;
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, productCode.getCode());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error deleting product", e);
+        }
     }
 
     @Override
     public boolean existsById(ProductCode productCode) {
-        return findById(productCode).isPresent();
+        String sql = "SELECT 1 FROM product WHERE product_code = ?";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, productCode.getCode());
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error checking product existence", e);
+        }
     }
 
     private Product mapResultSetToProduct(ResultSet rs) throws SQLException {
