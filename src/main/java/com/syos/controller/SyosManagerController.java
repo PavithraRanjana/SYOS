@@ -66,12 +66,12 @@ public class SyosManagerController {
         System.out.println("================================================");
         System.out.println();
         System.out.println("=== REPORTS MENU ===");
-        System.out.println("1. ЁЯУК Daily Sales Report");
-        System.out.println("2. ЁЯУж Restock Report (Maintain 70 units)");
-        System.out.println("3. тЪая╕П  Reorder Report (Below 50 units)");
-        System.out.println("4. ЁЯУЛ Stock Report (Batch-wise details)");
-        System.out.println("5. ЁЯз╛ Bill Report (All transactions)");
-        System.out.println("6. тмЕя╕П Back to Main Menu");
+        System.out.println("1. 🗓️ Daily Sales Report");
+        System.out.println("2. 📈 Restock Report (Maintain 70 units)");
+        System.out.println("3. 📉 Reorder Report (Below 50 units)");
+        System.out.println("4. 📊 Stock Report (Batch-wise details)");
+        System.out.println("5. 🧾 Bill Report (All transactions)");
+        System.out.println("6. ⏪ Back to Main Menu");
         System.out.println();
         System.out.print("Select report to generate: ");
     }
@@ -177,7 +177,7 @@ public class SyosManagerController {
         System.out.println("=".repeat(80));
 
         // Physical Store Section
-        System.out.println("\nЁЯУН PHYSICAL STORE SALES");
+        System.out.println("\n PHYSICAL STORE SALES");
         System.out.println("-".repeat(80));
         PhysicalStoreSales physicalSales = report.getPhysicalStoreSales();
 
@@ -200,7 +200,7 @@ public class SyosManagerController {
         System.out.printf("PHYSICAL STORE TOTAL: LKR %,15.2f\n", physicalSales.getRevenue());
 
         // Online Store Section
-        System.out.println("\nЁЯМР ONLINE STORE SALES");
+        System.out.println("\n ONLINE STORE SALES");
         System.out.println("-".repeat(80));
         OnlineStoreSales onlineSales = report.getOnlineStoreSales();
 
@@ -236,7 +236,7 @@ public class SyosManagerController {
         System.out.println("=".repeat(80));
 
         // Physical Store Section
-        System.out.println("\nЁЯУН PHYSICAL STORE RESTOCK NEEDS");
+        System.out.println("\n PHYSICAL STORE RESTOCK NEEDS");
         System.out.println("-".repeat(80));
         List<RestockItem> physicalItems = report.getPhysicalStoreItems();
 
@@ -300,7 +300,7 @@ public class SyosManagerController {
             System.out.println("-".repeat(80));
 
             for (ReorderItem item : items) {
-                String statusIcon = item.getStatus().equals("CRITICAL") ? "ЁЯЪи" : "тЪая╕П";
+                String statusIcon = item.getStatus().equals("CRITICAL") ? "🔴" : "🟢";
 
                 System.out.printf("%-15s %-40s %-10d %-10s %s\n",
                         item.getProductCode(),
@@ -377,7 +377,7 @@ public class SyosManagerController {
         System.out.println("=".repeat(90));
 
         // Physical Store Bills
-        System.out.println("\nЁЯУН PHYSICAL STORE TRANSACTIONS");
+        System.out.println("\n PHYSICAL STORE TRANSACTIONS");
         System.out.println("-".repeat(90));
         List<BillSummary> physicalBills = report.getPhysicalStoreBills();
 

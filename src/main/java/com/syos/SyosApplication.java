@@ -7,15 +7,15 @@ import com.syos.ui.impl.ConsoleUserInterface;
 import com.syos.utils.DatabaseConnection;
 
 /**
- * Updated SYOS Application with Inventory Manager functionality.
+ * Updated SYOS Application with complete functionality including Report Management.
  *
  * This class initializes all dependencies and starts the application.
- * Now includes the complete inventory management system with:
+ * Now includes the complete system with:
  * - Product management with auto-generated codes
  * - Batch management with FIFO+Expiry strategy
  * - Stock issuing with detailed analysis
  * - Undo functionality using Command pattern
- * - Comprehensive reporting
+ * - Comprehensive reporting for SYOS Manager
  */
 public class SyosApplication {
     public static void main(String[] args) {
@@ -33,6 +33,7 @@ public class SyosApplication {
             InventoryRepositoryImpl inventoryRepository = new InventoryRepositoryImpl();
             BillRepositoryImpl billRepository = new BillRepositoryImpl();
             CustomerRepositoryImpl customerRepository = new CustomerRepositoryImpl();
+            ReportRepositoryImpl reportRepository = new ReportRepositoryImpl(); // Added ReportRepository
 
             // Initialize core services
             System.out.println("⚙️ Initializing core services...");
@@ -53,17 +54,22 @@ public class SyosApplication {
             InventoryManagerServiceImpl inventoryManagerService = new InventoryManagerServiceImpl(
                     productRepository, inventoryRepository, codeGenerator);
 
+            // Initialize report service
+            System.out.println("📊 Initializing report management system...");
+            ReportServiceImpl reportService = new ReportServiceImpl(reportRepository);
+
             // Initialize UI
             System.out.println("🖥️ Initializing user interface...");
             ConsoleUserInterface ui = new ConsoleUserInterface();
 
-            // Initialize main controller with all services
+            // Initialize main controller with all services including ReportService
             MainMenuController mainController = new MainMenuController(
                     billingService,
                     productService,
                     onlineStoreService,
                     customerService,
-                    inventoryManagerService,  // New inventory manager service
+                    inventoryManagerService,
+                    reportService,  // Added ReportService
                     ui);
 
             // Display system ready message
@@ -87,20 +93,20 @@ public class SyosApplication {
 
     private static void displayStartupBanner() {
         System.out.println();
-        System.out.println("╔═══════════════════════════════════════════════════════════╗");
-        System.out.println("║                                                           ║");
-        System.out.println("║   ███████╗██╗   ██╗ ██████╗ ███████╗                    ║");
-        System.out.println("║   ██╔════╝╚██╗ ██╔╝██╔═══██╗██╔════╝                    ║");
-        System.out.println("║   ███████╗ ╚████╔╝ ██║   ██║███████╗                    ║");
-        System.out.println("║   ╚════██║  ╚██╔╝  ██║   ██║╚════██║                    ║");
-        System.out.println("║   ███████║   ██║   ╚██████╔╝███████║                    ║");
-        System.out.println("║   ╚══════╝   ╚═╝    ╚═════╝ ╚══════╝                    ║");
-        System.out.println("║                                                           ║");
-        System.out.println("║              Synex Outlet Store (SYOS)                   ║");
-        System.out.println("║           Complete Retail Management System              ║");
-        System.out.println("║                      Version 2.0                         ║");
-        System.out.println("║                                                           ║");
-        System.out.println("╚═══════════════════════════════════════════════════════════╝");
+        System.out.println("╔═════════════════════════════════════════════════════════════╗");
+        System.out.println("║                                                             ║");
+        System.out.println("║   ███████╗██╗   ██╗ ██████╗ ███████╗                      ║");
+        System.out.println("║   ██╔════╝╚██╗ ██╔╝██╔═══██╗██╔════╝                      ║");
+        System.out.println("║   ███████╗ ╚████╔╝ ██║   ██║███████╗                      ║");
+        System.out.println("║   ╚════██║  ╚██╔╝  ██║   ██║╚════██║                      ║");
+        System.out.println("║   ███████║   ██║   ╚██████╔╝███████║                      ║");
+        System.out.println("║   ╚══════╝   ╚═╝    ╚═════╝ ╚══════╝                      ║");
+        System.out.println("║                                                             ║");
+        System.out.println("║              Synex Outlet Store (SYOS)                     ║");
+        System.out.println("║           Complete Retail Management System                ║");
+        System.out.println("║                      Version 2.0                           ║");
+        System.out.println("║                                                             ║");
+        System.out.println("╚═════════════════════════════════════════════════════════════╝");
         System.out.println();
         System.out.println("🎯 Features:");
         System.out.println("   • Physical Store POS with cash transactions");
@@ -109,9 +115,9 @@ public class SyosApplication {
         System.out.println("   • FIFO + Expiry Date stock rotation");
         System.out.println("   • Batch tracking and traceability");
         System.out.println("   • Undo operations with Command Pattern");
-        System.out.println("   • Comprehensive reporting");
+        System.out.println("   • Comprehensive business reporting");
         System.out.println();
-        System.out.println("🏗️ Built with:");
+        System.out.println("🗃️ Built with:");
         System.out.println("   • 11 Design Patterns (Strategy, Command, Factory, etc.)");
         System.out.println("   • SOLID Principles");
         System.out.println("   • Clean Architecture");
@@ -128,11 +134,11 @@ public class SyosApplication {
         System.out.println("📋 Available Roles:");
         System.out.println("   1. 💳 Cashier - Physical store point of sale");
         System.out.println("   2. 📦 Inventory Manager - Product & stock management");
-        System.out.println("   3. 📊 SYOS Manager - Reports & analytics (coming soon)");
+        System.out.println("   3. 📊 SYOS Manager - Business reports & analytics");
         System.out.println("   4. 🛒 Online Customer - E-commerce shopping");
         System.out.println();
         System.out.println("🚀 Starting main menu...");
-        System.out.println("=" .repeat(60));
+        System.out.println("=".repeat(60));
         System.out.println();
 
         // Small delay for better UX

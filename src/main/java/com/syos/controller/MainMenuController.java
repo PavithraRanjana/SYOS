@@ -2,6 +2,7 @@ package com.syos.controller;
 
 import com.syos.service.impl.BillingServiceImpl;
 import com.syos.service.interfaces.InventoryManagerService;
+import com.syos.service.interfaces.ReportService;
 import com.syos.ui.interfaces.UserInterface;
 import com.syos.service.interfaces.BillingService;
 import com.syos.service.interfaces.ProductService;
@@ -14,23 +15,27 @@ public class MainMenuController {
     private final OnlineStoreService onlineStoreService;
     private final CustomerService customerService;
     private final InventoryManagerService inventoryManagerService;
+    private final ReportService reportService; // Added ReportService
     private final UserInterface ui;
 
     private final PhysicalStoreController cashierController;
     private final OnlineCustomerController onlineCustomerController;
     private final InventoryManagerController inventoryManagerController;
+    private final SyosManagerController syosManagerController; // Added SyosManagerController
 
     public MainMenuController(BillingServiceImpl billingService,
                               ProductService productService,
                               OnlineStoreService onlineStoreService,
                               CustomerService customerService,
                               InventoryManagerService inventoryManagerService,
+                              ReportService reportService, // Added ReportService parameter
                               UserInterface ui) {
         this.billingService = billingService;
         this.productService = productService;
         this.onlineStoreService = onlineStoreService;
         this.customerService = customerService;
         this.inventoryManagerService = inventoryManagerService;
+        this.reportService = reportService; // Initialize ReportService
         this.ui = ui;
 
         // Initialize sub-controllers
@@ -38,6 +43,7 @@ public class MainMenuController {
         this.onlineCustomerController = new OnlineCustomerController(billingService, productService,
                 onlineStoreService, customerService, ui);
         this.inventoryManagerController = new InventoryManagerController(inventoryManagerService, ui);
+        this.syosManagerController = new SyosManagerController(reportService, ui); // Initialize SyosManagerController
     }
 
     public void start() {
@@ -108,8 +114,7 @@ public class MainMenuController {
     private void startManagerInterface() {
         ui.clearScreen();
         System.out.println("=== SYOS MANAGER INTERFACE ===");
-        ui.displayError("Feature coming soon!");
-        ui.waitForEnter();
+        syosManagerController.startManagerMode(); // Now calls the actual manager controller!
     }
 
     private void startOnlineCustomerInterface() {
