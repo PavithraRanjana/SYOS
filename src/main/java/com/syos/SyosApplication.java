@@ -108,21 +108,6 @@ public class SyosApplication {
         System.out.println("║                                                             ║");
         System.out.println("╚═════════════════════════════════════════════════════════════╝");
         System.out.println();
-        System.out.println("🎯 Features:");
-        System.out.println("   • Physical Store POS with cash transactions");
-        System.out.println("   • Online Store with customer management");
-        System.out.println("   • Advanced Inventory Management System");
-        System.out.println("   • FIFO + Expiry Date stock rotation");
-        System.out.println("   • Batch tracking and traceability");
-        System.out.println("   • Undo operations with Command Pattern");
-        System.out.println("   • Comprehensive business reporting");
-        System.out.println();
-        System.out.println("🗃️ Built with:");
-        System.out.println("   • 11 Design Patterns (Strategy, Command, Factory, etc.)");
-        System.out.println("   • SOLID Principles");
-        System.out.println("   • Clean Architecture");
-        System.out.println("   • MySQL Database");
-        System.out.println("   • JUnit 5 & Mockito Testing");
         System.out.println();
     }
 
