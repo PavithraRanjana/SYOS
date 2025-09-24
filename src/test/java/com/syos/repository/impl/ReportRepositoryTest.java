@@ -280,19 +280,27 @@ class ReportRepositoryTest {
             when(preparedStatement.executeQuery()).thenReturn(resultSet);
 
             when(resultSet.next())
-                    .thenReturn(true)  // Critical item (0 units)
-                    .thenReturn(true)  // Low item (25 units)
-                    .thenReturn(false);
+                    .thenReturn(true)   // First row exists
+                    .thenReturn(true)   // Second row exists
+                    .thenReturn(false); // No more rows
 
+            // Due to ORDER BY total_quantity ASC, the 0-quantity item comes first
             when(resultSet.getString("product_code"))
-                    .thenReturn("CRITICAL001")
-                    .thenReturn("LOW001");
+                    .thenReturn("CRITICAL001")    // Row 1
+                    .thenReturn("LOW001");        // Row 2
+
             when(resultSet.getString("product_name"))
-                    .thenReturn("Critical Product")
-                    .thenReturn("Low Stock Product");
+                    .thenReturn("Critical Product")     // Row 1
+                    .thenReturn("Low Stock Product");   // Row 2
+
+            // CRITICAL FIX: getInt("total_quantity") is called TWICE per row!
+            // Row 1: status check (0) + constructor (0)
+            // Row 2: status check (25) + constructor (25)
             when(resultSet.getInt("total_quantity"))
-                    .thenReturn(0)
-                    .thenReturn(25);
+                    .thenReturn(0)      // Row 1, Call 1: status determination
+                    .thenReturn(0)      // Row 1, Call 2: constructor parameter
+                    .thenReturn(25)     // Row 2, Call 1: status determination
+                    .thenReturn(25);    // Row 2, Call 2: constructor parameter
 
             reportRepository = new ReportRepositoryImpl();
 
@@ -302,17 +310,19 @@ class ReportRepositoryTest {
             // Assert
             assertEquals(2, result.size());
 
-            ReorderItem criticalItem = result.get(0);
-            assertEquals("CRITICAL001", criticalItem.getProductCode());
-            assertEquals("Critical Product", criticalItem.getProductName());
-            assertEquals(0, criticalItem.getTotalQuantityAvailable());
-            assertEquals("CRITICAL", criticalItem.getStatus());
+            // First item should be the one with 0 quantity (CRITICAL)
+            ReorderItem firstItem = result.getFirst();
+            assertEquals("CRITICAL001", firstItem.getProductCode());
+            assertEquals("Critical Product", firstItem.getProductName());
+            assertEquals(0, firstItem.getTotalQuantityAvailable());
+            assertEquals("CRITICAL", firstItem.getStatus());
 
-            ReorderItem lowItem = result.get(1);
-            assertEquals("LOW001", lowItem.getProductCode());
-            assertEquals("Low Stock Product", lowItem.getProductName());
-            assertEquals(25, lowItem.getTotalQuantityAvailable());
-            assertEquals("LOW", lowItem.getStatus());
+            // Second item should be the one with 25 quantity (LOW)
+            ReorderItem secondItem = result.get(1);
+            assertEquals("LOW001", secondItem.getProductCode());
+            assertEquals("Low Stock Product", secondItem.getProductName());
+            assertEquals(25, secondItem.getTotalQuantityAvailable());
+            assertEquals("LOW", secondItem.getStatus());
 
             verify(preparedStatement).setDate(1, Date.valueOf(testDate));
         }
@@ -370,8 +380,8 @@ class ReportRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should handle products with no batches in stock report")
-    void shouldHandleProductsWithNoBatchesInStockReport() throws SQLException {
+    @DisplayName("Should handle products with no batches in stock report - Lenient Mode")
+    void shouldHandleProductsWithNoBatchesInStockReportLenient() throws SQLException {
         // Arrange
         try (MockedStatic<DatabaseConnection> mockedStatic = mockStatic(DatabaseConnection.class)) {
             mockedStatic.when(DatabaseConnection::getInstance).thenReturn(dbConnection);
@@ -383,16 +393,19 @@ class ReportRepositoryTest {
                     .thenReturn(true)
                     .thenReturn(false);
 
-            // Mock product with no batch data
+            // Required stubs (definitely called)
             when(resultSet.getString("product_code")).thenReturn("NEWPRODUCT");
             when(resultSet.getString("product_name")).thenReturn("New Product");
-            when(resultSet.getObject("batch_number")).thenReturn(null); // No batch
-            when(resultSet.getInt("quantity_received")).thenReturn(0);
-            when(resultSet.getDate("purchase_date")).thenReturn(null);
-            when(resultSet.getDate("expiry_date")).thenReturn(null);
-            when(resultSet.getInt("remaining_quantity")).thenReturn(0);
-            when(resultSet.getInt("physical_quantity")).thenReturn(0);
-            when(resultSet.getInt("online_quantity")).thenReturn(0);
+            when(resultSet.getObject("batch_number")).thenReturn(null);
+
+            // Optional stubs (may or may not be called depending on implementation logic)
+            // Use lenient() to avoid UnnecessaryStubbingException
+            lenient().when(resultSet.getInt("quantity_received")).thenReturn(0);
+            lenient().when(resultSet.getDate("purchase_date")).thenReturn(null);
+            lenient().when(resultSet.getDate("expiry_date")).thenReturn(null);
+            lenient().when(resultSet.getInt("remaining_quantity")).thenReturn(0);
+            lenient().when(resultSet.getInt("physical_quantity")).thenReturn(0);
+            lenient().when(resultSet.getInt("online_quantity")).thenReturn(0);
 
             reportRepository = new ReportRepositoryImpl();
 
@@ -411,7 +424,6 @@ class ReportRepositoryTest {
             assertEquals(0, item.getTotalQuantity());
         }
     }
-
     // ==================== BILL REPORT DATA TESTS ====================
 
     @Test
