@@ -5,6 +5,7 @@ import com.syos.domain.models.Product;
 import com.syos.domain.valueobjects.ProductCode;
 import com.syos.domain.valueobjects.Money;
 import com.syos.domain.enums.UnitOfMeasure;
+import com.syos.exceptions.BusinessRuleException;
 import com.syos.service.interfaces.InventoryManagerService;
 import com.syos.service.interfaces.InventoryCommand.CommandResult;
 import com.syos.service.impl.BatchSelectionContext.BatchSelectionResult;
@@ -17,6 +18,7 @@ import java.util.List;
 /**
  * Controller for Inventory Manager operations.
  * Provides CLI interface for all inventory management functions.
+ * Refactored to include pure business logic methods for unit testing.
  */
 public class InventoryManagerController {
 
@@ -28,6 +30,8 @@ public class InventoryManagerController {
         this.inventoryManagerService = inventoryManagerService;
         this.ui = ui;
     }
+
+    // ==================== MAIN ENTRY POINT ====================
 
     public void startInventoryManagerMode() {
         ui.clearScreen();
@@ -62,6 +66,276 @@ public class InventoryManagerController {
         }
     }
 
+    // ==================== PURE BUSINESS LOGIC METHODS (UNIT TESTABLE) ====================
+
+    /**
+     * Validates and parses a product code string.
+     * Business Rules: Cannot be null/empty, must be valid format, auto-trims and uppercases
+     */
+    public ProductCode parseProductCode(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Product code cannot be null");
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Product code cannot be empty");
+        }
+
+        try {
+            return new ProductCode(trimmed.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid product code format: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validates and parses an integer from string input.
+     */
+    public int parseInteger(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Input cannot be null");
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Input cannot be empty");
+        }
+
+        try {
+            return Integer.parseInt(trimmed);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid number format: '" + input + "'");
+        }
+    }
+
+    /**
+     * Validates and parses a positive integer for quantities.
+     */
+    public int parsePositiveInteger(String input) {
+        int value = parseInteger(input);
+        if (value <= 0) {
+            throw new BusinessRuleException("Value must be positive, got: " + value);
+        }
+        return value;
+    }
+
+    /**
+     * Validates and parses a BigDecimal for monetary amounts.
+     */
+    public BigDecimal parsePositiveBigDecimal(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Amount cannot be null");
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Amount cannot be empty");
+        }
+
+        BigDecimal value;
+        try {
+            value = new BigDecimal(trimmed);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid amount format: '" + input + "'");
+        }
+
+        if (value.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Amount must be positive, got: " + value);
+        }
+
+        return value;
+    }
+
+    /**
+     * Creates Money from BigDecimal with validation.
+     */
+    public Money createMoney(BigDecimal amount) {
+        if (amount == null) {
+            throw new IllegalArgumentException("Amount cannot be null");
+        }
+        return new Money(amount);
+    }
+
+    /**
+     * Parses Money from string input with full validation.
+     */
+    public Money parseMoney(String input) {
+        BigDecimal amount = parsePositiveBigDecimal(input);
+        return createMoney(amount);
+    }
+
+    /**
+     * Validates and parses a business date (cannot be in future).
+     */
+    public LocalDate parseBusinessDate(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Date cannot be null");
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Date cannot be empty");
+        }
+
+        LocalDate date;
+        try {
+            date = LocalDate.parse(trimmed);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid date format. Use YYYY-MM-DD format: " + e.getMessage());
+        }
+
+        if (date.isAfter(LocalDate.now())) {
+            throw new BusinessRuleException("Date cannot be in the future: " + date);
+        }
+
+        return date;
+    }
+
+    /**
+     * Parses optional expiry date (can be null/empty).
+     */
+    public LocalDate parseOptionalExpiryDate(String input) {
+        if (input == null || input.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            return LocalDate.parse(input.trim());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid expiry date format. Use YYYY-MM-DD format: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validates menu choice for UnitOfMeasure selection.
+     */
+    public UnitOfMeasure parseUnitOfMeasureChoice(int choice) {
+        UnitOfMeasure[] units = UnitOfMeasure.values();
+
+        if (choice < 1 || choice > units.length) {
+            throw new BusinessRuleException(
+                    String.format("Invalid choice: %d. Must be between 1 and %d", choice, units.length));
+        }
+
+        return units[choice - 1];
+    }
+
+    /**
+     * Validates batch number input.
+     */
+    public int parseBatchNumber(String input) {
+        int batchNumber = parseInteger(input);
+        if (batchNumber < 1) {
+            throw new BusinessRuleException("Batch number must be at least 1, got: " + batchNumber);
+        }
+        return batchNumber;
+    }
+
+    /**
+     * Validates threshold values with default fallback.
+     */
+    public int parseThresholdWithDefault(String input, int defaultValue) {
+        try {
+            int threshold = parseInteger(input);
+            return threshold > 0 ? threshold : defaultValue;
+        } catch (IllegalArgumentException e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Validates optional supplier name.
+     */
+    public String parseOptionalSupplierName(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+
+        if (trimmed.length() > 100) {
+            throw new BusinessRuleException("Supplier name too long. Maximum 100 characters, got: " + trimmed.length());
+        }
+
+        return trimmed;
+    }
+
+    /**
+     * Validates product name input.
+     */
+    public String parseProductName(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Product name cannot be null");
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Product name cannot be empty");
+        }
+
+        if (trimmed.length() > 255) {
+            throw new BusinessRuleException("Product name too long. Maximum 255 characters, got: " + trimmed.length());
+        }
+
+        return trimmed;
+    }
+
+    /**
+     * Validates optional description input.
+     */
+    public String parseOptionalDescription(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+
+        if (trimmed.length() > 1000) {
+            throw new BusinessRuleException("Description too long. Maximum 1000 characters, got: " + trimmed.length());
+        }
+
+        return trimmed;
+    }
+
+    /**
+     * Validates menu option selection.
+     */
+    public boolean isValidMenuOption(String input, int minOption, int maxOption) {
+        if (input == null || input.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            int option = Integer.parseInt(input.trim());
+            return option >= minOption && option <= maxOption;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Calculates total cost for batch creation.
+     */
+    public Money calculateBatchTotalCost(Money unitPrice, int quantity) {
+        if (unitPrice == null) {
+            throw new IllegalArgumentException("Unit price cannot be null");
+        }
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive");
+        }
+
+        return unitPrice.multiply(quantity);
+    }
+
+    // ==================== UI WORKFLOW METHODS ====================
+
     private void displayWelcome() {
         System.out.println("================================================");
         System.out.println("         SYOS - Inventory Manager");
@@ -79,13 +353,13 @@ public class InventoryManagerController {
         System.out.println("=== INVENTORY MANAGEMENT MENU ===");
         System.out.println("1. 📦 Add New Product");
         System.out.println("2. 📥 Add New Batch to Main Inventory");
-        System.out.println("3. 🗑️  Remove Batch from Main Inventory");
+        System.out.println("3. 🗑️ Remove Batch from Main Inventory");
         System.out.println("4. 🏪 Issue Stock to Physical Store");
         System.out.println("5. 🌐 Issue Stock to Online Store");
         System.out.println("6. 🔍 View Batch Selection Analysis");
         System.out.println("7. 📊 View Inventory Reports");
         System.out.println("8. 📋 View Product Inventory Status");
-        System.out.println("9. ↩️  Undo Last Operation");
+        System.out.println("9. ↩️ Undo Last Operation");
         System.out.println("10. ⬅️ Back to Main Menu");
         System.out.println();
         System.out.print("Select option: ");
@@ -113,19 +387,11 @@ public class InventoryManagerController {
             System.out.println("📋 Product code will be: " + preview);
             System.out.println();
 
-            // Get product details
-            String productName = ui.getUserInput("Enter product name: ");
-            if (productName.trim().isEmpty()) {
-                ui.displayError("Product name cannot be empty");
-                return;
-            }
-
+            // Get product details using pure methods
+            String productName = parseProductName(ui.getUserInput("Enter product name: "));
             BigDecimal priceAmount = getBigDecimalInput("Enter unit price (LKR): ");
-            Money unitPrice = new Money(priceAmount);
-
-            String description = ui.getUserInput("Enter description (optional): ");
-
-            // Get unit of measure
+            Money unitPrice = createMoney(priceAmount);
+            String description = parseOptionalDescription(ui.getUserInput("Enter description (optional): "));
             UnitOfMeasure unitOfMeasure = selectUnitOfMeasure();
 
             // Confirm details
@@ -133,7 +399,7 @@ public class InventoryManagerController {
             System.out.println("Product Code: " + preview);
             System.out.println("Product Name: " + productName);
             System.out.println("Unit Price: " + unitPrice);
-            System.out.println("Description: " + (description.isEmpty() ? "No description" : description));
+            System.out.println("Description: " + (description == null ? "No description" : description));
             System.out.println("Unit of Measure: " + unitOfMeasure.getValue());
 
             if (!ui.confirmAction("Create this product?")) {
@@ -144,7 +410,7 @@ public class InventoryManagerController {
             // Create product
             Product product = inventoryManagerService.addNewProduct(
                     productName, categoryId, subcategoryId, brandId,
-                    unitPrice, description.isEmpty() ? null : description, unitOfMeasure
+                    unitPrice, description, unitOfMeasure
             );
 
             ui.displaySuccess("✅ Product created successfully!");
@@ -163,7 +429,7 @@ public class InventoryManagerController {
         System.out.println("=== ADD NEW BATCH ===");
 
         try {
-            // Get product code
+            // Get product code using pure method
             ProductCode productCode = getProductCodeInput();
 
             // Validate product exists
@@ -173,41 +439,24 @@ public class InventoryManagerController {
                 return;
             }
 
-            // Get batch details
-            int quantity = getIntegerInput("Enter quantity received: ");
-            if (quantity <= 0) {
-                ui.displayError("Quantity must be positive");
-                return;
-            }
-
+            // Get batch details using pure methods
+            int quantity = parsePositiveInteger(ui.getUserInput("Enter quantity received: "));
             BigDecimal purchasePriceAmount = getBigDecimalInput("Enter purchase price per unit (LKR): ");
-            Money purchasePrice = new Money(purchasePriceAmount);
-
+            Money purchasePrice = createMoney(purchasePriceAmount);
             LocalDate purchaseDate = getDateInput("Enter purchase date (YYYY-MM-DD): ");
+            LocalDate expiryDate = parseOptionalExpiryDate(ui.getUserInput("Enter expiry date (YYYY-MM-DD, or press Enter if no expiry): "));
+            String supplier = parseOptionalSupplierName(ui.getUserInput("Enter supplier name (optional): "));
 
-            System.out.print("Enter expiry date (YYYY-MM-DD, or press Enter if no expiry): ");
-            String expiryInput = ui.getUserInput();
-            LocalDate expiryDate = null;
-            if (!expiryInput.trim().isEmpty()) {
-                try {
-                    expiryDate = LocalDate.parse(expiryInput);
-                } catch (DateTimeParseException e) {
-                    ui.displayError("Invalid expiry date format");
-                    return;
-                }
-            }
-
-            String supplier = ui.getUserInput("Enter supplier name (optional): ");
-
-            // Display batch summary
+            // Calculate and display batch summary
+            Money totalCost = calculateBatchTotalCost(purchasePrice, quantity);
             System.out.println("\n=== BATCH SUMMARY ===");
             System.out.println("Product: " + productCode);
             System.out.println("Quantity: " + quantity + " units");
             System.out.println("Purchase Price: " + purchasePrice + " per unit");
-            System.out.println("Total Cost: " + purchasePrice.multiply(quantity));
+            System.out.println("Total Cost: " + totalCost);
             System.out.println("Purchase Date: " + purchaseDate);
             System.out.println("Expiry Date: " + (expiryDate != null ? expiryDate : "No expiry"));
-            System.out.println("Supplier: " + (supplier.isEmpty() ? "Unknown" : supplier));
+            System.out.println("Supplier: " + (supplier != null ? supplier : "Unknown"));
 
             if (!ui.confirmAction("Add this batch?")) {
                 ui.displaySuccess("Batch creation cancelled.");
@@ -216,8 +465,7 @@ public class InventoryManagerController {
 
             // Add batch
             CommandResult result = inventoryManagerService.addBatch(
-                    productCode, quantity, purchasePrice, purchaseDate, expiryDate,
-                    supplier.isEmpty() ? null : supplier
+                    productCode, quantity, purchasePrice, purchaseDate, expiryDate, supplier
             );
 
             if (result.isSuccess()) {
@@ -238,9 +486,8 @@ public class InventoryManagerController {
         System.out.println("=== REMOVE BATCH ===");
 
         try {
-            int batchNumber = getIntegerInput("Enter batch number to remove: ");
+            int batchNumber = parseBatchNumber(ui.getUserInput("Enter batch number to remove: "));
 
-            // Show batch details first
             System.out.println("🔍 Looking up batch details...");
 
             if (!ui.confirmAction("⚠️ Are you sure you want to remove batch #" + batchNumber + "?")) {
@@ -283,8 +530,7 @@ public class InventoryManagerController {
                 return;
             }
 
-            // Show batch analysis first
-            int quantity = getIntegerInput("Enter quantity to issue: ");
+            int quantity = parsePositiveInteger(ui.getUserInput("Enter quantity to issue: "));
 
             System.out.println("🔍 Analyzing batch selection...");
             BatchSelectionResult analysis = inventoryManagerService.analyzeBatchSelection(productCode, quantity);
@@ -340,7 +586,7 @@ public class InventoryManagerController {
                 return;
             }
 
-            int quantity = getIntegerInput("Enter quantity for analysis: ");
+            int quantity = parsePositiveInteger(ui.getUserInput("Enter quantity for analysis: "));
 
             BatchSelectionResult result = inventoryManagerService.analyzeBatchSelection(productCode, quantity);
 
@@ -382,8 +628,7 @@ public class InventoryManagerController {
 
     private void showLowStockReport() {
         try {
-            int threshold = getIntegerInput("Enter minimum stock threshold (default 50): ");
-            if (threshold <= 0) threshold = 50;
+            int threshold = parseThresholdWithDefault(ui.getUserInput("Enter minimum stock threshold (default 50): "), 50);
 
             List<MainInventory> lowStockBatches = inventoryManagerService.getLowStockReport(threshold);
 
@@ -414,8 +659,7 @@ public class InventoryManagerController {
 
     private void showExpiryReport() {
         try {
-            int daysAhead = getIntegerInput("Enter days ahead to check (default 30): ");
-            if (daysAhead <= 0) daysAhead = 30;
+            int daysAhead = parseThresholdWithDefault(ui.getUserInput("Enter days ahead to check (default 30): "), 30);
 
             List<MainInventory> expiringBatches = inventoryManagerService.getExpiryReport(daysAhead);
 
@@ -559,7 +803,7 @@ public class InventoryManagerController {
         ui.waitForEnter();
     }
 
-    // ==================== HELPER METHODS ====================
+    // ==================== UI HELPER METHODS (USING PURE METHODS) ====================
 
     private void displayCategories() {
         System.out.println("Available Categories:");
@@ -603,12 +847,9 @@ public class InventoryManagerController {
         while (true) {
             try {
                 int choice = getIntegerInput("Enter choice (1-" + units.length + "): ");
-                if (choice >= 1 && choice <= units.length) {
-                    return units[choice - 1];
-                }
-                ui.displayError("Invalid choice. Please try again.");
-            } catch (Exception e) {
-                ui.displayError("Invalid input. Please enter a number.");
+                return parseUnitOfMeasureChoice(choice);
+            } catch (BusinessRuleException e) {
+                ui.displayError(e.getMessage());
             }
         }
     }
@@ -617,8 +858,8 @@ public class InventoryManagerController {
         while (true) {
             try {
                 String input = ui.getUserInput("Enter product code: ");
-                return new ProductCode(input);
-            } catch (IllegalArgumentException e) {
+                return parseProductCode(input);
+            } catch (IllegalArgumentException | BusinessRuleException e) {
                 ui.displayError("Invalid product code: " + e.getMessage());
             }
         }
@@ -628,9 +869,9 @@ public class InventoryManagerController {
         while (true) {
             try {
                 String input = ui.getUserInput(prompt);
-                return Integer.parseInt(input);
-            } catch (NumberFormatException e) {
-                ui.displayError("Invalid number. Please try again.");
+                return parseInteger(input);
+            } catch (IllegalArgumentException e) {
+                ui.displayError("Invalid number: " + e.getMessage());
             }
         }
     }
@@ -639,14 +880,9 @@ public class InventoryManagerController {
         while (true) {
             try {
                 String input = ui.getUserInput(prompt);
-                BigDecimal value = new BigDecimal(input);
-                if (value.compareTo(BigDecimal.ZERO) <= 0) {
-                    ui.displayError("Amount must be positive");
-                    continue;
-                }
-                return value;
-            } catch (NumberFormatException e) {
-                ui.displayError("Invalid amount. Please enter a valid number.");
+                return parsePositiveBigDecimal(input);
+            } catch (IllegalArgumentException | BusinessRuleException e) {
+                ui.displayError("Invalid amount: " + e.getMessage());
             }
         }
     }
@@ -655,14 +891,9 @@ public class InventoryManagerController {
         while (true) {
             try {
                 String input = ui.getUserInput(prompt);
-                LocalDate date = LocalDate.parse(input);
-                if (date.isAfter(LocalDate.now())) {
-                    ui.displayError("Date cannot be in the future");
-                    continue;
-                }
-                return date;
-            } catch (DateTimeParseException e) {
-                ui.displayError("Invalid date format. Please use YYYY-MM-DD format.");
+                return parseBusinessDate(input);
+            } catch (IllegalArgumentException | BusinessRuleException e) {
+                ui.displayError("Invalid date: " + e.getMessage());
             }
         }
     }
