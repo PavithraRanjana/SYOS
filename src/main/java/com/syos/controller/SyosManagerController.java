@@ -66,12 +66,12 @@ public class SyosManagerController {
         System.out.println("================================================");
         System.out.println();
         System.out.println("=== REPORTS MENU ===");
-        System.out.println("1. 🗓️ Daily Sales Report");
-        System.out.println("2. 📈 Restock Report (Maintain 70 units)");
-        System.out.println("3. 📉 Reorder Report (Below 50 units)");
-        System.out.println("4. 📊 Stock Report (Batch-wise details)");
+        System.out.println("1. 📊 Daily Sales Report");
+        System.out.println("2. 📦 Restock Report (Maintain 70 units)");
+        System.out.println("3. ⚠️ Reorder Report (Below 50 units)");
+        System.out.println("4. 📋 Stock Report (Batch-wise details)");
         System.out.println("5. 🧾 Bill Report (All transactions)");
-        System.out.println("6. ⏪ Back to Main Menu");
+        System.out.println("6. ⬅️ Back to Main Menu");
         System.out.println();
         System.out.print("Select report to generate: ");
     }
@@ -177,7 +177,7 @@ public class SyosManagerController {
         System.out.println("=".repeat(80));
 
         // Physical Store Section
-        System.out.println("\n PHYSICAL STORE SALES");
+        System.out.println("\n🏪 PHYSICAL STORE SALES");
         System.out.println("-".repeat(80));
         PhysicalStoreSales physicalSales = report.getPhysicalStoreSales();
 
@@ -200,7 +200,7 @@ public class SyosManagerController {
         System.out.printf("PHYSICAL STORE TOTAL: LKR %,15.2f\n", physicalSales.getRevenue());
 
         // Online Store Section
-        System.out.println("\n ONLINE STORE SALES");
+        System.out.println("\n🌐 ONLINE STORE SALES");
         System.out.println("-".repeat(80));
         OnlineStoreSales onlineSales = report.getOnlineStoreSales();
 
@@ -236,12 +236,12 @@ public class SyosManagerController {
         System.out.println("=".repeat(80));
 
         // Physical Store Section
-        System.out.println("\n PHYSICAL STORE RESTOCK NEEDS");
+        System.out.println("\n🏪 PHYSICAL STORE RESTOCK NEEDS");
         System.out.println("-".repeat(80));
         List<RestockItem> physicalItems = report.getPhysicalStoreItems();
 
         if (physicalItems.isEmpty()) {
-            System.out.println("тЬЕ All physical store items are adequately stocked (70+ units).");
+            System.out.println("✅ All physical store items are adequately stocked (70+ units).");
         } else {
             System.out.printf("%-15s %-35s %-10s %-10s\n", "Code", "Product Name", "Current", "Needed");
             System.out.println("-".repeat(80));
@@ -259,12 +259,12 @@ public class SyosManagerController {
         }
 
         // Online Store Section
-        System.out.println("\nЁЯМР ONLINE STORE RESTOCK NEEDS");
+        System.out.println("\n🌐 ONLINE STORE RESTOCK NEEDS");
         System.out.println("-".repeat(80));
         List<RestockItem> onlineItems = report.getOnlineStoreItems();
 
         if (onlineItems.isEmpty()) {
-            System.out.println("тЬЕ All online store items are adequately stocked (70+ units).");
+            System.out.println("✅ All online store items are adequately stocked (70+ units).");
         } else {
             System.out.printf("%-15s %-35s %-10s %-10s\n", "Code", "Product Name", "Current", "Needed");
             System.out.println("-".repeat(80));
@@ -294,13 +294,13 @@ public class SyosManagerController {
         List<ReorderItem> items = report.getItems();
 
         if (items.isEmpty()) {
-            System.out.println("тЬЕ All products in main inventory have adequate stock (50+ units).");
+            System.out.println("✅ All products in main inventory have adequate stock (50+ units).");
         } else {
             System.out.printf("%-15s %-40s %-10s %-10s\n", "Code", "Product Name", "Available", "Status");
             System.out.println("-".repeat(80));
 
             for (ReorderItem item : items) {
-                String statusIcon = item.getStatus().equals("CRITICAL") ? "🔴" : "🟢";
+                String statusIcon = item.getStatus().equals("CRITICAL") ? "🚨" : "⚠️";
 
                 System.out.printf("%-15s %-40s %-10d %-10s %s\n",
                         item.getProductCode(),
@@ -377,7 +377,7 @@ public class SyosManagerController {
         System.out.println("=".repeat(90));
 
         // Physical Store Bills
-        System.out.println("\n PHYSICAL STORE TRANSACTIONS");
+        System.out.println("\n🏪 PHYSICAL STORE TRANSACTIONS");
         System.out.println("-".repeat(90));
         List<BillSummary> physicalBills = report.getPhysicalStoreBills();
 
@@ -403,7 +403,7 @@ public class SyosManagerController {
         System.out.printf("Physical Store Transactions: %d\n", report.getTotalPhysicalTransactions());
 
         // Online Store Bills
-        System.out.println("\nЁЯМР ONLINE STORE TRANSACTIONS");
+        System.out.println("\n🌐 ONLINE STORE TRANSACTIONS");
         System.out.println("-".repeat(90));
         List<BillSummary> onlineBills = report.getOnlineStoreBills();
 
@@ -441,16 +441,24 @@ public class SyosManagerController {
             try {
                 String input = ui.getUserInput(prompt + " (YYYY-MM-DD) or 'today': ");
 
-                if ("today".equalsIgnoreCase(input.trim())) {
+                // Handle null input
+                if (input == null) {
+                    ui.displayError("Invalid input received. Please try again.");
+                    continue;
+                }
+
+                String trimmedInput = input.trim();
+
+                if ("today".equalsIgnoreCase(trimmedInput)) {
                     return LocalDate.now();
                 }
 
-                if (input.trim().isEmpty()) {
+                if (trimmedInput.isEmpty()) {
                     ui.displayError("Date cannot be empty. Please try again.");
                     continue;
                 }
 
-                LocalDate date = LocalDate.parse(input.trim());
+                LocalDate date = LocalDate.parse(trimmedInput);
 
                 // Validate date is not in the future
                 if (date.isAfter(LocalDate.now())) {
